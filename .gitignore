@@ -1,0 +1,50 @@
+# 環境變數
+.env
+.env.local
+.env.*.local
+
+# 依賴
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# 編輯器
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# 測試
+coverage/
+.nyc_output/
+*.lcov
+
+# 日誌
+logs/
+*.log
+
+# 暫存檔案
+tmp/
+temp/
+*.tmp
+
+# 系統檔案
+Thumbs.db
+.DS_Store
+
+# Railway
+.railway/
+
+# 備份檔案
+*.bak
+*.backup
+*~
+
+# 資料庫
+*.sqlite
+*.sqlite3
+*.db
