@@ -44,8 +44,47 @@ class BidService {
             throw new AppError('找不到團隊', ERROR_CODES.GAME_NOT_FOUND, 404);
         }
 
-        // 4. 買入投標：檢查資金並借貸
+        // 4. 檢查每種魚最多2個不同價格限制
+        const existingBids = await Bid.findByGameDay(gameId, game.current_day, {
+            team_id: team.id,
+            bid_type: bidType,
+            fish_type: fishType
+        });
+
+        const existingPrices = new Set(existingBids.map(b => parseFloat(b.price)));
+
+        if (existingPrices.has(parseFloat(price))) {
+            throw new AppError(
+                `${fishType}魚該價格已有投標`,
+                ERROR_CODES.DUPLICATE_BID,
+                400
+            );
+        }
+
+        if (existingPrices.size >= 2) {
+            throw new AppError(
+                '每種魚最多2個不同價格',
+                ERROR_CODES.TOO_MANY_BIDS,
+                400
+            );
+        }
+
+        // 5. 買入投標：檢查底價和資金
         if (bidType === BID_TYPE.BUY) {
+            // ⚠️ 檢查價格是否低於底價（保護漁民利益）
+            const floorPrice = fishType === 'A' ?
+                parseFloat(game.distributor_floor_price_a) :
+                parseFloat(game.distributor_floor_price_b);
+
+            if (price < floorPrice) {
+                throw new AppError(
+                    `價格不得低於底價 $${floorPrice}`,
+                    ERROR_CODES.INVALID_PRICE,
+                    400,
+                    { fishType, price, floorPrice }
+                );
+            }
+
             const requiredAmount = price * quantity;
             const loanResult = await LoanService.checkAndBorrow(team.id, requiredAmount);
 

@@ -231,6 +231,15 @@ class SettlementService {
             if (remainingBudget <= 0) break;
         }
 
+        // 5. ⚠️ 關鍵遊戲規則：當日結束，所有剩餘庫存歸零！
+        // 不論有沒有賣出，當天所有庫存都要清空
+        const allTeams = await Team.findByGame(gameId);
+        for (const clearTeam of allTeams) {
+            await Team.update(clearTeam.id, {
+                [fishType === FISH_TYPE.A ? 'fish_a_inventory' : 'fish_b_inventory']: 0
+            });
+        }
+
         return {
             totalSold,
             totalRevenue,
