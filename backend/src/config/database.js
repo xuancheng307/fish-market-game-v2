@@ -5,19 +5,44 @@
 const mysql = require('mysql2/promise');
 require('dotenv').config();
 
+// 解析資料庫連線 URL 或使用個別環境變數
+function getDatabaseConfig() {
+    const databaseUrl = process.env.DATABASE_URL;
+
+    if (databaseUrl) {
+        // 解析 DATABASE_URL
+        const url = new URL(databaseUrl);
+        return {
+            host: url.hostname,
+            port: parseInt(url.port) || 3306,
+            user: url.username,
+            password: url.password,
+            database: url.pathname.slice(1), // 移除開頭的 /
+            waitForConnections: true,
+            connectionLimit: 10,
+            queueLimit: 0,
+            enableKeepAlive: true,
+            keepAliveInitialDelay: 0
+        };
+    } else {
+        // 使用個別環境變數
+        return {
+            host: process.env.DB_HOST || process.env.MYSQLHOST || 'localhost',
+            port: parseInt(process.env.DB_PORT || process.env.MYSQLPORT || '3306'),
+            user: process.env.DB_USER || process.env.MYSQLUSER || 'root',
+            password: process.env.DB_PASSWORD || process.env.MYSQLPASSWORD || '',
+            database: process.env.DB_NAME || process.env.MYSQLDATABASE || 'railway',
+            waitForConnections: true,
+            connectionLimit: 10,
+            queueLimit: 0,
+            enableKeepAlive: true,
+            keepAliveInitialDelay: 0
+        };
+    }
+}
+
 // 資料庫連線配置
-const dbConfig = {
-    host: process.env.DB_HOST || process.env.MYSQLHOST,
-    port: parseInt(process.env.DB_PORT || process.env.MYSQLPORT || '3306'),
-    user: process.env.DB_USER || process.env.MYSQLUSER,
-    password: process.env.DB_PASSWORD || process.env.MYSQLPASSWORD,
-    database: process.env.DB_NAME || process.env.MYSQLDATABASE,
-    waitForConnections: true,
-    connectionLimit: 10,
-    queueLimit: 0,
-    enableKeepAlive: true,
-    keepAliveInitialDelay: 0
-};
+const dbConfig = getDatabaseConfig();
 
 // 創建連線池
 let pool = null;
