@@ -37,34 +37,51 @@ async function runMigrations() {
     try {
         console.log('[Migration] 連接到資料庫...');
 
-        // 讀取 migration SQL 文件
-        const sqlFile = path.join(__dirname, '001_initial_schema.sql');
-        const sql = fs.readFileSync(sqlFile, 'utf8');
+        // 讀取所有 migration SQL 文件（按檔名排序）
+        const migrationFiles = fs.readdirSync(__dirname)
+            .filter(file => file.endsWith('.sql'))
+            .sort();
 
-        // 分割成多個語句（以分號分隔）
-        const statements = sql
-            .split(';')
-            .map(stmt => stmt.trim())
-            .filter(stmt => stmt.length > 0);
+        console.log(`[Migration] 發現 ${migrationFiles.length} 個 migration 文件: ${migrationFiles.join(', ')}`);
 
-        console.log(`[Migration] 執行 ${statements.length} 個 SQL 語句...`);
+        let totalStatements = 0;
+        let executedStatements = 0;
 
-        // 逐個執行
-        for (let i = 0; i < statements.length; i++) {
-            try {
-                await connection.query(statements[i]);
-                console.log(`[Migration] ✓ 語句 ${i + 1}/${statements.length} 執行成功`);
-            } catch (error) {
-                // 忽略 "table already exists" 錯誤
-                if (error.code === 'ER_TABLE_EXISTS_ERROR') {
-                    console.log(`[Migration] ⚠ 語句 ${i + 1}/${statements.length} - 表已存在，跳過`);
-                } else {
-                    throw error;
+        // 逐個執行每個 migration 文件
+        for (const migrationFile of migrationFiles) {
+            console.log(`[Migration] 執行 ${migrationFile}...`);
+
+            const sqlFile = path.join(__dirname, migrationFile);
+            const sql = fs.readFileSync(sqlFile, 'utf8');
+
+            // 分割成多個語句（以分號分隔）
+            const statements = sql
+                .split(';')
+                .map(stmt => stmt.trim())
+                .filter(stmt => stmt.length > 0);
+
+            totalStatements += statements.length;
+
+            // 逐個執行語句
+            for (let i = 0; i < statements.length; i++) {
+                try {
+                    await connection.query(statements[i]);
+                    executedStatements++;
+                    console.log(`[Migration] ✓ ${migrationFile} - 語句 ${i + 1}/${statements.length} 執行成功`);
+                } catch (error) {
+                    // 忽略 "table already exists" 和 "column already exists" 錯誤
+                    if (error.code === 'ER_TABLE_EXISTS_ERROR' || error.code === 'ER_DUP_FIELDNAME') {
+                        console.log(`[Migration] ⚠ ${migrationFile} - 語句 ${i + 1}/${statements.length} - 已存在，跳過`);
+                    } else {
+                        console.error(`[Migration] ✗ ${migrationFile} - 語句 ${i + 1} 執行失敗:`, error.message);
+                        throw error;
+                    }
                 }
             }
         }
 
-        console.log('[Migration] ✓ 所有 migration 執行完成！');
+        console.log(`[Migration] ✓ 所有 migration 執行完成！共 ${executedStatements}/${totalStatements} 個語句執行成功`);
+
 
     } catch (error) {
         console.error('[Migration] ✗ 錯誤:', error.message);

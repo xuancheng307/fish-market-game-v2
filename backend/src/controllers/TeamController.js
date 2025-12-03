@@ -98,6 +98,11 @@ class TeamController {
         // 獲取當前天數的投標記錄
         const bids = await BidService.getTeamBids(req.user.id, parseInt(req.params.id), game.current_day);
 
+        // 獲取歷史每日結果
+        const DailyResult = require('../models/DailyResult');
+        const { dailyResultToApi } = require('../utils/transformers');
+        const dailyResults = await DailyResult.findByTeam(myTeam.id, parseInt(req.params.id));
+
         res.json({
             success: true,
             data: {
@@ -105,7 +110,8 @@ class TeamController {
                 currentDay: gameDayToApi(currentDay),
                 myTeam: teamToApi(myTeam),
                 loanStatus,
-                myBids: bids.map(bid => bidToApi(bid))
+                myBids: bids.map(bid => bidToApi(bid)),
+                dailyResults: dailyResults.map(dr => dailyResultToApi(dr))  // 新增：歷史每日結果
             }
         });
     });

@@ -269,13 +269,36 @@ class SettlementService {
             const totalInvestment = parseFloat(game.initial_budget) + parseFloat(team.total_loan_principal);
             const roi = totalInvestment > 0 ? (cumulativeProfit / totalInvestment) * 100 : 0;
 
-            // 4. 更新團隊狀態
+            // 4. 計算當日魚類交易量統計
+            const { BID_TYPE, FISH_TYPE } = require('../config/constants');
+            const teamBids = await Bid.findByGameDay(gameId, dayNumber, { team_id: team.id });
+
+            let fishAPurchased = 0, fishASold = 0, fishBPurchased = 0, fishBSold = 0;
+
+            for (const bid of teamBids) {
+                const qty = bid.quantity_fulfilled || 0;
+                if (bid.bid_type === BID_TYPE.BUY) {
+                    if (bid.fish_type === FISH_TYPE.A) {
+                        fishAPurchased += qty;
+                    } else if (bid.fish_type === FISH_TYPE.B) {
+                        fishBPurchased += qty;
+                    }
+                } else if (bid.bid_type === BID_TYPE.SELL) {
+                    if (bid.fish_type === FISH_TYPE.A) {
+                        fishASold += qty;
+                    } else if (bid.fish_type === FISH_TYPE.B) {
+                        fishBSold += qty;
+                    }
+                }
+            }
+
+            // 5. 更新團隊狀態
             await Team.update(team.id, {
                 cumulative_profit: cumulativeProfit,
                 roi: roi
             });
 
-            // 5. 保存每日結果
+            // 6. 保存每日結果（包含交易量統計）
             const dailyResult = await DailyResult.create({
                 game_id: gameId,
                 team_id: team.id,
@@ -285,6 +308,10 @@ class SettlementService {
                 total_loan: totalLoan,
                 fish_a_inventory: team.fish_a_inventory,
                 fish_b_inventory: team.fish_b_inventory,
+                fish_a_purchased: fishAPurchased,
+                fish_a_sold: fishASold,
+                fish_b_purchased: fishBPurchased,
+                fish_b_sold: fishBSold,
                 cumulative_profit: cumulativeProfit,
                 roi: roi
             });

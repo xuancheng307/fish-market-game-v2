@@ -197,19 +197,32 @@ function dailyResultToApi(dbRow) {
         teamId: dbRow.team_id,
         dayNumber: dbRow.day_number,
 
-        revenue: parseFloat(dbRow.revenue),
-        cost: parseFloat(dbRow.cost),
-        profit: parseFloat(dbRow.profit),
+        // 財務數據 (使用前端期望的欄位名稱)
+        totalRevenue: parseFloat(dbRow.revenue),  // revenue → totalRevenue
+        totalCost: parseFloat(dbRow.cost),  // cost → totalCost
+        dailyProfit: parseFloat(dbRow.profit),  // profit → dailyProfit
         interestPaid: parseFloat(dbRow.interest_paid),
         unsoldFee: parseFloat(dbRow.unsold_fee),
+        loanInterest: parseFloat(dbRow.interest_paid),  // 貸款利息別名
+        unsoldPenalty: parseFloat(dbRow.unsold_fee),  // 滯銷罰金別名
 
-        currentBudget: parseFloat(dbRow.current_budget),
+        // 期末狀態 (使用前端期望的欄位名稱)
+        dayEndCash: parseFloat(dbRow.current_budget),  // current_budget → dayEndCash
+        currentBudget: parseFloat(dbRow.current_budget),  // 保留舊名稱以相容性
         totalLoan: parseFloat(dbRow.total_loan),
         fishAInventory: dbRow.fish_a_inventory,
         fishBInventory: dbRow.fish_b_inventory,
 
-        cumulativeProfit: parseFloat(dbRow.cumulative_profit),
+        // 累計數據 (使用前端期望的欄位名稱)
+        accumulatedProfit: parseFloat(dbRow.cumulative_profit),  // cumulative_profit → accumulatedProfit
+        cumulativeProfit: parseFloat(dbRow.cumulative_profit),  // 保留舊名稱以相容性
         roi: parseFloat(dbRow.roi),
+
+        // 交易量數據 (如果資料庫有這些欄位)
+        fishAPurchased: dbRow.fish_a_purchased || 0,
+        fishASold: dbRow.fish_a_sold || 0,
+        fishBPurchased: dbRow.fish_b_purchased || 0,
+        fishBSold: dbRow.fish_b_sold || 0,
 
         createdAt: dbRow.created_at
     };

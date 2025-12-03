@@ -29,4 +29,8 @@ router.post('/games/:id/force-end', AdminController.forceEnd);
 router.post('/games/:id/pause', AdminController.pause);
 router.post('/games/:id/resume', AdminController.resume);
 
+// 數據查詢
+router.get('/games/:gameId/bids', AdminController.getAllBids);
+router.get('/games/:gameId/daily-results', AdminController.getDailyResults);
+
 module.exports = router;

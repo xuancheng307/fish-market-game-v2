@@ -5,10 +5,14 @@
 
 const GameService = require('../services/GameService');
 const Game = require('../models/Game');
+const Bid = require('../models/Bid');
+const DailyResult = require('../models/DailyResult');
 const {
     gameToApi,
     gameDayToApi,
-    teamToApi
+    teamToApi,
+    bidToApi,
+    dailyResultToApi
 } = require('../utils/transformers');
 const { asyncHandler } = require('../middleware/errorHandler');
 
@@ -192,6 +196,92 @@ class AdminController {
             success: true,
             message: '遊戲已恢復',
             data: gameToApi(game)
+        });
+    });
+
+    /**
+     * GET /api/admin/games/:gameId/bids - 獲取所有團隊投標記錄（管理員）
+     */
+    static getAllBids = asyncHandler(async (req, res) => {
+        const gameId = parseInt(req.params.gameId);
+        const { dayNumber, fishType, bidType } = req.query;
+
+        // 構建篩選條件
+        const filters = {};
+        if (fishType) filters.fish_type = fishType;
+        if (bidType) filters.bid_type = bidType;
+
+        // 如果有指定天數，查詢該天的投標；否則查詢整個遊戲的投標
+        let bids;
+        if (dayNumber) {
+            bids = await Bid.findByGameDay(gameId, parseInt(dayNumber), filters);
+        } else {
+            // 查詢遊戲所有投標
+            const game = await Game.findById(gameId);
+            if (!game) {
+                return res.status(404).json({
+                    success: false,
+                    message: '遊戲不存在'
+                });
+            }
+
+            // 查詢所有天數的投標
+            const allBids = [];
+            for (let day = 1; day <= game.current_day; day++) {
+                const dayBids = await Bid.findByGameDay(gameId, day, filters);
+                allBids.push(...dayBids);
+            }
+            bids = allBids;
+        }
+
+        res.json({
+            success: true,
+            data: bids.map(bid => bidToApi(bid))
+        });
+    });
+
+    /**
+     * GET /api/admin/games/:gameId/daily-results - 獲取每日統計結果（管理員）
+     */
+    static getDailyResults = asyncHandler(async (req, res) => {
+        const gameId = parseInt(req.params.gameId);
+        const { dayNumber } = req.query;
+
+        let results;
+        if (dayNumber) {
+            // 查詢指定天數的所有團隊結果
+            results = await DailyResult.findByGameDay(gameId, parseInt(dayNumber));
+        } else {
+            // 查詢遊戲所有天數的結果
+            const game = await Game.findById(gameId);
+            if (!game) {
+                return res.status(404).json({
+                    success: false,
+                    message: '遊戲不存在'
+                });
+            }
+
+            const allResults = [];
+            for (let day = 1; day <= game.current_day; day++) {
+                const dayResults = await DailyResult.findByGameDay(gameId, day);
+                allResults.push(...dayResults);
+            }
+            results = allResults;
+        }
+
+        // 如果是查詢特定天數，進行排名
+        if (dayNumber && results.length > 0) {
+            // 按 ROI 降序排序並添加排名
+            results.sort((a, b) => b.roi - a.roi);
+            results = results.map((result, index) => ({
+                ...result,
+                rank: index + 1
+            }));
+        }
+
+        res.json({
+            success: true,
+            data: results.map(result => dailyResultToApi(result))
         });
     });
 }
