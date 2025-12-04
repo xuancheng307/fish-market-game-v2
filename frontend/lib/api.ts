@@ -117,7 +117,7 @@ class ApiClient {
     const activeGame = games.find((g: Game) => g.status === 'active')
     return {
       success: true,
-      data: activeGame || null,
+      data: activeGame,
       message: activeGame ? '獲取成功' : '沒有進行中的遊戲'
     }
   }
@@ -142,7 +142,7 @@ class ApiClient {
     const response: ApiResponse<any> = await this.client.get(`/admin/games/${gameId}`)
     return {
       success: true,
-      data: response.data?.currentDay || null,
+      data: response.data?.currentDay,
       message: '獲取成功'
     }
   }
@@ -179,7 +179,7 @@ class ApiClient {
     const response: ApiResponse<any> = await this.client.get(`/team/games/${gameId}/my-status`)
     return {
       success: true,
-      data: response.data?.myTeam || null,
+      data: response.data?.myTeam,
       message: '獲取成功'
     }
   }
