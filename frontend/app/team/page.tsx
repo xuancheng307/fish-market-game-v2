@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Card, Form, InputNumber, Button, Space, Table, Tag, Alert, Row, Col, Statistic, message, Descriptions } from 'antd'
+import { Card, Form, InputNumber, Button, Space, Table, Tag, Alert, Row, Col, Statistic, message, Descriptions, Modal } from 'antd'
 import {
   ShoppingCartOutlined,
   DollarOutlined,
@@ -9,11 +9,14 @@ import {
   CloseCircleOutlined,
   MinusCircleOutlined,
   InfoCircleOutlined,
+  TrophyOutlined,
+  RiseOutlined,
+  FallOutlined,
 } from '@ant-design/icons'
 import { api } from '@/lib/api'
 import { wsClient } from '@/lib/websocket'
 import { DAY_STATUS, BID_TYPE, FISH_TYPE } from '@/lib/constants'
-import type { Game, GameDay, Bid, Team } from '@/lib/types'
+import type { Game, GameDay, Bid, Team, DailyResult } from '@/lib/types'
 
 export default function TeamHomePage() {
   const [form] = Form.useForm()
@@ -23,6 +26,8 @@ export default function TeamHomePage() {
   const [myTeam, setMyTeam] = useState<Team | null>(null)
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
+  const [settlementModalVisible, setSettlementModalVisible] = useState(false)
+  const [settlementResult, setSettlementResult] = useState<DailyResult | null>(null)
 
   // 載入資料
   const loadData = async () => {
@@ -51,6 +56,31 @@ export default function TeamHomePage() {
     }
   }
 
+  // 處理結算完成事件
+  const handleSettlementComplete = async () => {
+    if (!game) return
+
+    try {
+      // 載入最新的每日結果
+      const response = await api.getMyDailyResults(game.id)
+      const dailyResults = response.data || []
+
+      // 獲取最新一天的結果（當前天數）
+      const latestResult = dailyResults.find(r => r.dayNumber === game.currentDay)
+
+      if (latestResult) {
+        setSettlementResult(latestResult)
+        setSettlementModalVisible(true)
+      }
+
+      // 重新載入所有資料
+      await loadData()
+    } catch (error) {
+      console.error('載入結算結果失敗:', error)
+      await loadData()
+    }
+  }
+
   useEffect(() => {
     loadData()
 
@@ -64,7 +94,7 @@ export default function TeamHomePage() {
     })
 
     wsClient.onSettlementComplete(() => {
-      loadData()
+      handleSettlementComplete()
     })
 
     return () => {
@@ -431,6 +461,168 @@ export default function TeamHomePage() {
           />
         </Card>
       </Space>
+
+      {/* 結算結果彈窗 */}
+      <Modal
+        title={
+          <Space>
+            <TrophyOutlined style={{ fontSize: 20, color: '#1890ff' }} />
+            <span>第 {settlementResult?.dayNumber} 天結算結果</span>
+          </Space>
+        }
+        open={settlementModalVisible}
+        onCancel={() => setSettlementModalVisible(false)}
+        footer={[
+          <Button key="close" type="primary" onClick={() => setSettlementModalVisible(false)}>
+            確定
+          </Button>
+        ]}
+        width={800}
+      >
+        {settlementResult && (
+          <Space direction="vertical" style={{ width: '100%' }} size="large">
+            {/* 核心指標 */}
+            <Row gutter={[16, 16]}>
+              <Col xs={24} sm={12}>
+                <Card size="small">
+                  <Statistic
+                    title="ROI"
+                    value={(settlementResult.roi * 100).toFixed(2)}
+                    suffix="%"
+                    prefix={settlementResult.roi > 0 ? <RiseOutlined /> : settlementResult.roi < 0 ? <FallOutlined /> : null}
+                    valueStyle={{
+                      color: settlementResult.roi > 0 ? '#52c41a' : settlementResult.roi < 0 ? '#ff4d4f' : '#000',
+                      fontSize: 32
+                    }}
+                  />
+                </Card>
+              </Col>
+              <Col xs={24} sm={12}>
+                <Card size="small">
+                  <Statistic
+                    title="累積收益"
+                    value={settlementResult.cumulativeProfit}
+                    prefix={<DollarOutlined />}
+                    valueStyle={{
+                      color: settlementResult.cumulativeProfit > 0 ? '#52c41a' : settlementResult.cumulativeProfit < 0 ? '#ff4d4f' : '#000',
+                      fontSize: 32
+                    }}
+                  />
+                </Card>
+              </Col>
+            </Row>
+
+            {/* 詳細數據 */}
+            <Card title="本日明細" size="small">
+              <Descriptions column={2} bordered size="small">
+                <Descriptions.Item label="當日收益">
+                  <span style={{ color: settlementResult.dailyProfit > 0 ? '#52c41a' : settlementResult.dailyProfit < 0 ? '#ff4d4f' : '#000' }}>
+                    ${settlementResult.dailyProfit.toLocaleString()}
+                  </span>
+                </Descriptions.Item>
+                <Descriptions.Item label="期末現金">
+                  ${settlementResult.dayEndCash.toLocaleString()}
+                </Descriptions.Item>
+                <Descriptions.Item label="總收入">
+                  ${settlementResult.totalRevenue.toLocaleString()}
+                </Descriptions.Item>
+                <Descriptions.Item label="總成本">
+                  ${settlementResult.totalCost.toLocaleString()}
+                </Descriptions.Item>
+                <Descriptions.Item label="貸款利息">
+                  {settlementResult.loanInterest > 0 ? (
+                    <span style={{ color: '#ff4d4f' }}>-${settlementResult.loanInterest.toLocaleString()}</span>
+                  ) : (
+                    '-'
+                  )}
+                </Descriptions.Item>
+                <Descriptions.Item label="滯銷罰金">
+                  {settlementResult.unsoldPenalty > 0 ? (
+                    <span style={{ color: '#ff4d4f' }}>-${settlementResult.unsoldPenalty.toLocaleString()}</span>
+                  ) : (
+                    '-'
+                  )}
+                </Descriptions.Item>
+              </Descriptions>
+            </Card>
+
+            {/* 交易數據 */}
+            <Card title="交易數據" size="small">
+              <Row gutter={[16, 16]}>
+                <Col xs={12} sm={6}>
+                  <Statistic
+                    title="買入A級魚"
+                    value={settlementResult.fishAPurchased}
+                    suffix="kg"
+                    valueStyle={{ color: '#722ed1' }}
+                  />
+                </Col>
+                <Col xs={12} sm={6}>
+                  <Statistic
+                    title="賣出A級魚"
+                    value={settlementResult.fishASold}
+                    suffix="kg"
+                    valueStyle={{ color: '#722ed1' }}
+                  />
+                </Col>
+                <Col xs={12} sm={6}>
+                  <Statistic
+                    title="買入B級魚"
+                    value={settlementResult.fishBPurchased}
+                    suffix="kg"
+                    valueStyle={{ color: '#fa8c16' }}
+                  />
+                </Col>
+                <Col xs={12} sm={6}>
+                  <Statistic
+                    title="賣出B級魚"
+                    value={settlementResult.fishBSold}
+                    suffix="kg"
+                    valueStyle={{ color: '#fa8c16' }}
+                  />
+                </Col>
+              </Row>
+
+              {(settlementResult.fishAUnsold > 0 || settlementResult.fishBUnsold > 0) && (
+                <Alert
+                  message="滯銷提醒"
+                  description={
+                    <div>
+                      {settlementResult.fishAUnsold > 0 && <div>A級魚滯銷: {settlementResult.fishAUnsold} kg</div>}
+                      {settlementResult.fishBUnsold > 0 && <div>B級魚滯銷: {settlementResult.fishBUnsold} kg</div>}
+                    </div>
+                  }
+                  type="warning"
+                  showIcon
+                  style={{ marginTop: 16 }}
+                />
+              )}
+            </Card>
+
+            {/* 庫存狀況 */}
+            <Card title="期末庫存" size="small">
+              <Row gutter={16}>
+                <Col xs={12}>
+                  <Statistic
+                    title="A級魚庫存"
+                    value={settlementResult.fishAInventory}
+                    suffix="kg"
+                    valueStyle={{ color: settlementResult.fishAInventory > 0 ? '#722ed1' : '#d9d9d9' }}
+                  />
+                </Col>
+                <Col xs={12}>
+                  <Statistic
+                    title="B級魚庫存"
+                    value={settlementResult.fishBInventory}
+                    suffix="kg"
+                    valueStyle={{ color: settlementResult.fishBInventory > 0 ? '#fa8c16' : '#d9d9d9' }}
+                  />
+                </Col>
+              </Row>
+            </Card>
+          </Space>
+        )}
+      </Modal>
     </div>
   )
 }

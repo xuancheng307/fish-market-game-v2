@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Card, Button, Tag, Space, Statistic, Row, Col, message, Modal, Descriptions, Alert } from 'antd'
+import { Card, Button, Tag, Space, Statistic, Row, Col, message, Modal, Descriptions, Alert, Table } from 'antd'
 import {
   PlayCircleOutlined,
   PauseCircleOutlined,
@@ -10,11 +10,15 @@ import {
   ClockCircleOutlined,
   TeamOutlined,
   DollarOutlined,
+  TrophyOutlined,
+  RiseOutlined,
+  FallOutlined,
+  CheckCircleOutlined,
 } from '@ant-design/icons'
 import { api } from '@/lib/api'
 import { wsClient } from '@/lib/websocket'
 import { DAY_STATUS, STATUS_DISPLAY_TEXT } from '@/lib/constants'
-import type { Game, GameDay, Team, Bid } from '@/lib/types'
+import type { Game, GameDay, Team, Bid, DailyResult } from '@/lib/types'
 
 export default function GameControlPage() {
   const [game, setGame] = useState<Game | null>(null)
@@ -23,6 +27,9 @@ export default function GameControlPage() {
   const [allBids, setAllBids] = useState<Bid[]>([])
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState(false)
+  const [settlementModalVisible, setSettlementModalVisible] = useState(false)
+  const [settlementResults, setSettlementResults] = useState<DailyResult[]>([])
+  const [settlementDay, setSettlementDay] = useState<number>(0)
 
   // 載入遊戲資料
   const loadGameData = async () => {
@@ -62,6 +69,29 @@ export default function GameControlPage() {
     }
   }
 
+  // 處理結算完成事件
+  const handleSettlementComplete = async () => {
+    if (!game) return
+
+    try {
+      // 載入所有團隊的結算結果
+      const response = await api.getDailyResults(game.id, game.currentDay)
+      const results = response.data || []
+
+      if (results.length > 0) {
+        setSettlementResults(results.sort((a, b) => b.roi - a.roi))
+        setSettlementDay(game.currentDay)
+        setSettlementModalVisible(true)
+      }
+
+      // 重新載入所有資料
+      await loadGameData()
+    } catch (error) {
+      console.error('載入結算結果失敗:', error)
+      await loadGameData()
+    }
+  }
+
   useEffect(() => {
     loadGameData()
 
@@ -79,10 +109,15 @@ export default function GameControlPage() {
       loadGameData()
     })
 
+    wsClient.onSettlementComplete(() => {
+      handleSettlementComplete()
+    })
+
     return () => {
       wsClient.off('phaseChange')
       wsClient.off('gameUpdate')
       wsClient.off('bidSubmitted')
+      wsClient.off('settlementComplete')
     }
   }, [])
 
@@ -450,6 +485,173 @@ export default function GameControlPage() {
           </Card>
         </Col>
       </Row>
+
+      {/* 結算結果彈窗 */}
+      <Modal
+        title={
+          <Space>
+            <TrophyOutlined style={{ fontSize: 20, color: '#1890ff' }} />
+            <span>第 {settlementDay} 天結算結果</span>
+          </Space>
+        }
+        open={settlementModalVisible}
+        onCancel={() => setSettlementModalVisible(false)}
+        footer={[
+          <Button key="close" type="primary" onClick={() => setSettlementModalVisible(false)}>
+            確定
+          </Button>
+        ]}
+        width={1200}
+      >
+        <Alert
+          message="結算完成"
+          description={`第 ${settlementDay} 天的結算已完成，以下是所有團隊的結果排名。`}
+          type="success"
+          showIcon
+          icon={<CheckCircleOutlined />}
+          style={{ marginBottom: 16 }}
+        />
+
+        <Table
+          dataSource={settlementResults}
+          rowKey="id"
+          pagination={false}
+          scroll={{ x: 1400 }}
+          columns={[
+            {
+              title: '排名',
+              key: 'rank',
+              width: 80,
+              fixed: 'left',
+              render: (_: any, record: DailyResult, index: number) => {
+                const icons = [
+                  <TrophyOutlined style={{ color: '#FFD700', fontSize: 24 }} />,
+                  <TrophyOutlined style={{ color: '#C0C0C0', fontSize: 22 }} />,
+                  <TrophyOutlined style={{ color: '#CD7F32', fontSize: 20 }} />,
+                ]
+                return (
+                  <div style={{ textAlign: 'center' }}>
+                    {index < 3 ? icons[index] : <span style={{ fontSize: 18 }}>{index + 1}</span>}
+                  </div>
+                )
+              },
+            },
+            {
+              title: '團隊',
+              dataIndex: 'teamNumber',
+              key: 'teamNumber',
+              width: 100,
+              fixed: 'left',
+              render: (num: number) => <strong>第 {num} 隊</strong>,
+            },
+            {
+              title: 'ROI',
+              dataIndex: 'roi',
+              key: 'roi',
+              width: 120,
+              render: (roi: number) => (
+                <Tag color={roi > 0 ? 'success' : roi < 0 ? 'error' : 'default'} style={{ fontSize: 14 }}>
+                  {roi > 0 ? <RiseOutlined /> : roi < 0 ? <FallOutlined /> : null}
+                  {' '}{(roi * 100).toFixed(2)}%
+                </Tag>
+              ),
+            },
+            {
+              title: '累積收益',
+              dataIndex: 'cumulativeProfit',
+              key: 'cumulativeProfit',
+              width: 130,
+              render: (profit: number) => (
+                <span style={{
+                  color: profit > 0 ? '#52c41a' : profit < 0 ? '#ff4d4f' : '#000',
+                  fontWeight: 'bold',
+                  fontSize: 14
+                }}>
+                  ${profit.toLocaleString()}
+                </span>
+              ),
+            },
+            {
+              title: '當日收益',
+              dataIndex: 'dailyProfit',
+              key: 'dailyProfit',
+              width: 120,
+              render: (profit: number) => (
+                <span style={{ color: profit > 0 ? '#52c41a' : profit < 0 ? '#ff4d4f' : '#000' }}>
+                  ${profit.toLocaleString()}
+                </span>
+              ),
+            },
+            {
+              title: '期末現金',
+              dataIndex: 'dayEndCash',
+              key: 'dayEndCash',
+              width: 120,
+              render: (cash: number) => `$${cash.toLocaleString()}`,
+            },
+            {
+              title: '買入A',
+              dataIndex: 'fishAPurchased',
+              key: 'fishAPurchased',
+              width: 90,
+              render: (qty: number) => `${qty} kg`,
+            },
+            {
+              title: '賣出A',
+              dataIndex: 'fishASold',
+              key: 'fishASold',
+              width: 90,
+              render: (qty: number) => `${qty} kg`,
+            },
+            {
+              title: '買入B',
+              dataIndex: 'fishBPurchased',
+              key: 'fishBPurchased',
+              width: 90,
+              render: (qty: number) => `${qty} kg`,
+            },
+            {
+              title: '賣出B',
+              dataIndex: 'fishBSold',
+              key: 'fishBSold',
+              width: 90,
+              render: (qty: number) => `${qty} kg`,
+            },
+            {
+              title: '總收入',
+              dataIndex: 'totalRevenue',
+              key: 'totalRevenue',
+              width: 110,
+              render: (revenue: number) => `$${revenue.toLocaleString()}`,
+            },
+            {
+              title: '總成本',
+              dataIndex: 'totalCost',
+              key: 'totalCost',
+              width: 110,
+              render: (cost: number) => `$${cost.toLocaleString()}`,
+            },
+            {
+              title: '滯銷罰金',
+              dataIndex: 'unsoldPenalty',
+              key: 'unsoldPenalty',
+              width: 110,
+              render: (penalty: number) => penalty > 0 ? (
+                <span style={{ color: '#ff4d4f' }}>-${penalty.toLocaleString()}</span>
+              ) : '-',
+            },
+            {
+              title: '貸款利息',
+              dataIndex: 'loanInterest',
+              key: 'loanInterest',
+              width: 110,
+              render: (interest: number) => interest > 0 ? (
+                <span style={{ color: '#ff4d4f' }}>-${interest.toLocaleString()}</span>
+              ) : '-',
+            },
+          ]}
+        />
+      </Modal>
     </div>
   )
 }
