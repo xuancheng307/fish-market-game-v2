@@ -94,7 +94,8 @@ class ApiClient {
 
   async getHistoryGames(): Promise<ApiResponse<Game[]>> {
     // 獲取已結束的遊戲（finished 或 force_ended）
-    const response = await this.client.get('/admin/games')
+    // 注意：interceptor 已經解開 response.data，所以這裡拿到的是 { success, data, message }
+    const response: ApiResponse<Game[]> = await this.client.get('/admin/games')
     const games = response.data || []
     const historyGames = games.filter((g: Game) => g.status === 'finished' || g.status === 'force_ended')
     return {
@@ -110,7 +111,8 @@ class ApiClient {
 
   async getActiveGame(): Promise<ApiResponse<Game>> {
     // 使用 getAllGames 並篩選出 active 的遊戲
-    const response = await this.client.get('/admin/games')
+    // 注意：interceptor 已經解開 response.data，所以這裡拿到的是 { success, data, message }
+    const response: ApiResponse<Game[]> = await this.client.get('/admin/games')
     const games = response.data || []
     const activeGame = games.find((g: Game) => g.status === 'active')
     return {
@@ -135,7 +137,9 @@ class ApiClient {
   // ============ 遊戲天數相關 (管理員) ============
   async getCurrentGameDay(gameId: number): Promise<ApiResponse<GameDay>> {
     // 使用 getGameById 獲取遊戲詳情，其中包含當前天數資訊
-    const response = await this.client.get(`/admin/games/${gameId}`)
+    // 注意：interceptor 已經解開 response.data，所以這裡拿到的是 { success, data, message }
+    // 後端 AdminController.getGameDetails 回傳 { game, currentDay, teams }
+    const response: ApiResponse<any> = await this.client.get(`/admin/games/${gameId}`)
     return {
       success: true,
       data: response.data?.currentDay || null,
@@ -170,7 +174,9 @@ class ApiClient {
   // ============ 團隊相關 ============
   async getTeamInfo(gameId: number): Promise<ApiResponse<Team>> {
     // 使用 my-status 獲取我的團隊資訊
-    const response = await this.client.get(`/team/games/${gameId}/my-status`)
+    // 注意：interceptor 已經解開 response.data，所以這裡拿到的是 { success, data, message }
+    // 後端 TeamController.getMyStatus 回傳 { game, currentDay, myTeam, loanStatus, myBids, dailyResults }
+    const response: ApiResponse<any> = await this.client.get(`/team/games/${gameId}/my-status`)
     return {
       success: true,
       data: response.data?.myTeam || null,
@@ -220,7 +226,8 @@ class ApiClient {
 
   async getTeamDailyResults(gameId: number): Promise<ApiResponse<DailyResult[]>> {
     // 從 my-status 獲取我的每日結果
-    const response = await this.client.get(`/team/games/${gameId}/my-status`)
+    // 注意：interceptor 已經解開 response.data，所以這裡拿到的是 { success, data, message }
+    const response: ApiResponse<any> = await this.client.get(`/team/games/${gameId}/my-status`)
     return {
       success: true,
       data: response.data?.dailyResults || [],
@@ -236,7 +243,8 @@ class ApiClient {
 
   // 新增：獲取我的歷史統計
   async getMyDailyResults(gameId: number): Promise<ApiResponse<DailyResult[]>> {
-    const response = await this.client.get(`/team/games/${gameId}/my-status`)
+    // 注意：interceptor 已經解開 response.data，所以這裡拿到的是 { success, data, message }
+    const response: ApiResponse<any> = await this.client.get(`/team/games/${gameId}/my-status`)
     return {
       success: true,
       data: response.data?.dailyResults || [],
