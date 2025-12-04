@@ -17,6 +17,7 @@ export interface Game {
   totalDays: number
   currentDay: number
   numTeams: number
+  teamNames: string[]
   initialBudget: number
   dailyInterestRate: number
   loanInterestRate: number
@@ -29,6 +30,9 @@ export interface Game {
   targetPriceB: number
   buyingDuration: number
   sellingDuration: number
+  isForceEnded: boolean
+  forceEndedAt: string | null
+  forceEndDay: number | null
   createdAt: string
   updatedAt: string
 }
@@ -90,6 +94,9 @@ export interface DailyResult {
   dayNumber: number
   teamId: number
   dayEndCash: number
+  totalLoan: number
+  fishAInventory: number
+  fishBInventory: number
   fishAPurchased: number
   fishBPurchased: number
   fishASold: number
@@ -104,6 +111,7 @@ export interface DailyResult {
   cumulativeProfit: number
   roi: number
   teamNumber: number
+  createdAt: string
 }
 
 export interface LoginRequest {
