@@ -110,7 +110,15 @@ class ApiClient {
   }
 
   async getActiveGame(): Promise<ApiResponse<Game>> {
-    // 使用 getAllGames 並篩選出 active 的遊戲
+    // 根據角色使用不同的 API
+    const userRole = typeof window !== 'undefined' ? localStorage.getItem('userRole') : null
+
+    if (userRole === 'team') {
+      // 團隊使用專用的 API
+      return this.client.get('/team/active-game')
+    }
+
+    // 管理員使用 getAllGames 並篩選出 active 的遊戲
     // 注意：interceptor 已經解開 response.data，所以這裡拿到的是 { success, data, message }
     const response: ApiResponse<Game[]> = await this.client.get('/admin/games')
     const games = response.data || []
@@ -134,10 +142,23 @@ class ApiClient {
     throw new Error('不支持的狀態更新')
   }
 
-  // ============ 遊戲天數相關 (管理員) ============
+  // ============ 遊戲天數相關 ============
   async getCurrentGameDay(gameId: number): Promise<ApiResponse<GameDay>> {
-    // 使用 getGameById 獲取遊戲詳情，其中包含當前天數資訊
-    // 注意：interceptor 已經解開 response.data，所以這裡拿到的是 { success, data, message }
+    // 根據角色使用不同的 API
+    const userRole = typeof window !== 'undefined' ? localStorage.getItem('userRole') : null
+
+    if (userRole === 'team') {
+      // 團隊使用 /team/games/:id/status
+      // 後端 TeamController.getGameStatus 回傳 { game, currentDay }
+      const response: ApiResponse<any> = await this.client.get(`/team/games/${gameId}/status`)
+      return {
+        success: true,
+        data: response.data?.currentDay,
+        message: '獲取成功'
+      }
+    }
+
+    // 管理員使用 /admin/games/:id
     // 後端 AdminController.getGameDetails 回傳 { game, currentDay, teams }
     const response: ApiResponse<any> = await this.client.get(`/admin/games/${gameId}`)
     return {

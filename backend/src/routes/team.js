@@ -10,6 +10,9 @@ const { verifyToken } = require('../middleware/auth');
 // 所有團隊路由都需要認證
 router.use(verifyToken);
 
+// 獲取當前進行中的遊戲
+router.get('/active-game', TeamController.getActiveGame);
+
 // 投標相關
 router.post('/bids', TeamController.submitBid);
 router.get('/games/:gameId/bids', TeamController.getTeamBids);

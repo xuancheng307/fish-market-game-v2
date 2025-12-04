@@ -5,6 +5,7 @@
 
 const BidService = require('../services/BidService');
 const GameService = require('../services/GameService');
+const Game = require('../models/Game');
 const Team = require('../models/Team');
 const LoanService = require('../services/LoanService');
 const {
@@ -16,6 +17,28 @@ const {
 const { asyncHandler } = require('../middleware/errorHandler');
 
 class TeamController {
+    /**
+     * GET /api/team/active-game - 獲取當前進行中的遊戲
+     */
+    static getActiveGame = asyncHandler(async (req, res) => {
+        const games = await Game.findAll();
+        const activeGame = games.find(g => g.status === 'active');
+
+        if (!activeGame) {
+            return res.json({
+                success: true,
+                data: null,
+                message: '沒有進行中的遊戲'
+            });
+        }
+
+        res.json({
+            success: true,
+            data: gameToApi(activeGame),
+            message: '獲取成功'
+        });
+    });
+
     /**
      * POST /api/bids - 提交投標
      */
