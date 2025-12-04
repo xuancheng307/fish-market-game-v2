@@ -5,6 +5,11 @@
 /**
  * 從錯誤物件中提取錯誤訊息字串
  * 確保返回的是字串，避免 React 渲染物件時報錯
+ *
+ * 後端錯誤格式可能是：
+ * - { message: "錯誤訊息" }
+ * - { error: "錯誤訊息" }
+ * - { error: { message: "錯誤訊息", code: "...", details: ... } }
  */
 export function getErrorMessage(error: any, defaultMessage: string = '操作失敗'): string {
   if (!error) return defaultMessage
@@ -12,6 +17,11 @@ export function getErrorMessage(error: any, defaultMessage: string = '操作失�
   // 如果 error.message 是字串，直接返回
   if (typeof error.message === 'string' && error.message) {
     return error.message
+  }
+
+  // 如果 error.error 是物件且有 message 屬性
+  if (error.error && typeof error.error === 'object' && typeof error.error.message === 'string') {
+    return error.error.message
   }
 
   // 如果 error.error 是字串，返回
