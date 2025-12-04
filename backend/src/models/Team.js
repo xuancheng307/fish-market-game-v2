@@ -48,19 +48,20 @@ class Team {
             game_id,
             user_id,
             team_name,
+            team_number = null,
             current_budget,
             initial_budget
         } = teamData;
 
         const result = await query(
             `INSERT INTO game_participants (
-                game_id, user_id, team_name,
+                game_id, user_id, team_name, team_number,
                 current_budget, initial_budget,
                 total_loan, total_loan_principal,
                 fish_a_inventory, fish_b_inventory,
                 cumulative_profit, roi
-            ) VALUES (?, ?, ?, ?, ?, 0, 0, 0, 0, 0, 0)`,
-            [game_id, user_id, team_name, current_budget, initial_budget]
+            ) VALUES (?, ?, ?, ?, ?, ?, 0, 0, 0, 0, 0, 0)`,
+            [game_id, user_id, team_name, team_number, current_budget, initial_budget]
         );
 
         return await this.findById(result.insertId);

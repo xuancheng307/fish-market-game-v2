@@ -254,6 +254,7 @@ class SettlementService {
     static async dailySettlement(gameId, dayNumber) {
         const teams = await Team.findByGame(gameId);
         const game = await Game.findById(gameId);
+        const gameDay = await GameDay.findByGameAndDay(gameId, dayNumber);
         const results = [];
 
         for (const team of teams) {
@@ -292,15 +293,20 @@ class SettlementService {
                 }
             }
 
-            // 5. 更新團隊狀態
+            // 5. 計算滯銷數量 (買入 - 賣出 = 滯銷)
+            const fishAUnsold = Math.max(0, fishAPurchased - fishASold);
+            const fishBUnsold = Math.max(0, fishBPurchased - fishBSold);
+
+            // 6. 更新團隊狀態
             await Team.update(team.id, {
                 cumulative_profit: cumulativeProfit,
                 roi: roi
             });
 
-            // 6. 保存每日結果（包含交易量統計）
+            // 7. 保存每日結果（包含交易量統計、滯銷數量、game_day_id）
             const dailyResult = await DailyResult.create({
                 game_id: gameId,
+                game_day_id: gameDay ? gameDay.id : null,
                 team_id: team.id,
                 day_number: dayNumber,
                 interest_paid: interestResult.interest,
@@ -312,6 +318,8 @@ class SettlementService {
                 fish_a_sold: fishASold,
                 fish_b_purchased: fishBPurchased,
                 fish_b_sold: fishBSold,
+                fish_a_unsold: fishAUnsold,
+                fish_b_unsold: fishBUnsold,
                 cumulative_profit: cumulativeProfit,
                 roi: roi
             });

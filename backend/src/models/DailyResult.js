@@ -16,7 +16,11 @@ class DailyResult {
 
     static async findByGameDay(gameId, dayNumber) {
         return await query(
-            'SELECT * FROM daily_results WHERE game_id = ? AND day_number = ? ORDER BY team_id ASC',
+            `SELECT dr.*, gp.team_number
+             FROM daily_results dr
+             LEFT JOIN game_participants gp ON dr.team_id = gp.id
+             WHERE dr.game_id = ? AND dr.day_number = ?
+             ORDER BY dr.team_id ASC`,
             [gameId, dayNumber]
         );
     }
@@ -45,6 +49,7 @@ class DailyResult {
     static async create(resultData) {
         const {
             game_id,
+            game_day_id,
             team_id,
             day_number,
             revenue = 0,
@@ -60,25 +65,29 @@ class DailyResult {
             fish_a_sold = 0,
             fish_b_purchased = 0,
             fish_b_sold = 0,
+            fish_a_unsold = 0,
+            fish_b_unsold = 0,
             cumulative_profit = 0,
             roi = 0
         } = resultData;
 
         const result = await query(
             `INSERT INTO daily_results (
-                game_id, team_id, day_number,
+                game_id, game_day_id, team_id, day_number,
                 revenue, cost, profit, interest_paid, unsold_fee,
                 current_budget, total_loan,
                 fish_a_inventory, fish_b_inventory,
                 fish_a_purchased, fish_a_sold, fish_b_purchased, fish_b_sold,
+                fish_a_unsold, fish_b_unsold,
                 cumulative_profit, roi
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
-                game_id, team_id, day_number,
+                game_id, game_day_id, team_id, day_number,
                 revenue, cost, profit, interest_paid, unsold_fee,
                 current_budget, total_loan,
                 fish_a_inventory, fish_b_inventory,
                 fish_a_purchased, fish_a_sold, fish_b_purchased, fish_b_sold,
+                fish_a_unsold, fish_b_unsold,
                 cumulative_profit, roi
             ]
         );

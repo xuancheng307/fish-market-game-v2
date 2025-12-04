@@ -194,6 +194,7 @@ function dailyResultToApi(dbRow) {
     return {
         id: dbRow.id,
         gameId: dbRow.game_id,
+        gameDayId: dbRow.game_day_id,
         teamId: dbRow.team_id,
         dayNumber: dbRow.day_number,
 
@@ -218,11 +219,18 @@ function dailyResultToApi(dbRow) {
         cumulativeProfit: parseFloat(dbRow.cumulative_profit),  // 保留舊名稱以相容性
         roi: parseFloat(dbRow.roi),
 
-        // 交易量數據 (如果資料庫有這些欄位)
+        // 交易量數據
         fishAPurchased: dbRow.fish_a_purchased || 0,
         fishASold: dbRow.fish_a_sold || 0,
         fishBPurchased: dbRow.fish_b_purchased || 0,
         fishBSold: dbRow.fish_b_sold || 0,
+
+        // 滯銷數量
+        fishAUnsold: dbRow.fish_a_unsold || 0,
+        fishBUnsold: dbRow.fish_b_unsold || 0,
+
+        // 團隊編號 (如果有提供)
+        teamNumber: dbRow.team_number || null,
 
         createdAt: dbRow.created_at
     };

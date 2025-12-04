@@ -60,7 +60,10 @@ class GameService {
 
             // 3. 創建團隊參與記錄
             if (team_names && Array.isArray(team_names)) {
-                for (const teamName of team_names) {
+                for (let i = 0; i < team_names.length; i++) {
+                    const teamName = team_names[i];
+                    const teamNumber = i + 1; // 團隊編號從 1 開始
+
                     // 查找或創建用戶
                     const username = teamName.toLowerCase().replace(/\s+/g, '');
                     let user = await User.findByUsername(username);
@@ -74,11 +77,12 @@ class GameService {
                         });
                     }
 
-                    // 創建團隊參與記錄
+                    // 創建團隊參與記錄（包含 team_number）
                     await Team.create({
                         game_id: game.id,
                         user_id: user.id,
                         team_name: teamName,
+                        team_number: teamNumber,
                         current_budget: initial_budget,
                         initial_budget: initial_budget
                     });
