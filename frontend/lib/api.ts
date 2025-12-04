@@ -92,6 +92,18 @@ class ApiClient {
     return this.client.get('/admin/games')
   }
 
+  async getHistoryGames(): Promise<ApiResponse<Game[]>> {
+    // 獲取已結束的遊戲（finished 或 force_ended）
+    const response = await this.client.get('/admin/games')
+    const games = response.data || []
+    const historyGames = games.filter((g: Game) => g.status === 'finished' || g.status === 'force_ended')
+    return {
+      success: true,
+      data: historyGames,
+      message: '獲取成功'
+    }
+  }
+
   async getGameById(gameId: number): Promise<ApiResponse<Game>> {
     return this.client.get(`/admin/games/${gameId}`)
   }
@@ -166,6 +178,11 @@ class ApiClient {
     }
   }
 
+  async getMyTeamStatus(gameId: number): Promise<ApiResponse<Team>> {
+    // getTeamInfo 的別名
+    return this.getTeamInfo(gameId)
+  }
+
   async getAllTeams(gameId: number): Promise<ApiResponse<Team[]>> {
     return this.client.get(`/team/games/${gameId}/teams`)
   }
@@ -188,6 +205,10 @@ class ApiClient {
 
   async deleteBid(bidId: number): Promise<ApiResponse> {
     return this.client.delete(`/team/bids/${bidId}`)
+  }
+
+  async updateBid(bidId: number, data: { price?: number; quantity?: number }): Promise<ApiResponse<Bid>> {
+    return this.client.put(`/team/bids/${bidId}`, data)
   }
 
   // ============ 每日結果相關 ============

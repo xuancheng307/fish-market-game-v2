@@ -39,11 +39,11 @@ export default function TeamHomePage() {
         setGame(gameResponse.data)
 
         const dayResponse = await api.getCurrentGameDay(gameResponse.data.id)
-        setGameDay(dayResponse.data)
+        setGameDay(dayResponse.data || null)
 
         // 載入我的團隊資訊（包含庫存）
         const teamResponse = await api.getTeamInfo(gameResponse.data.id)
-        setMyTeam(teamResponse.data)
+        setMyTeam(teamResponse.data || null)
 
         // 載入我的投標記錄
         const bidsResponse = await api.getMyBids(gameResponse.data.id, gameResponse.data.currentDay)
@@ -117,7 +117,7 @@ export default function TeamHomePage() {
         bidType: values.bidType,
         fishType: values.fishType,
         price: values.price,
-        quantitySubmitted: values.quantity,
+        quantity: values.quantity,
       }
 
       await api.submitBid(bidData)

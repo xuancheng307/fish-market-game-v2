@@ -371,10 +371,10 @@ export default function TeamStatsPage() {
             <Col xs={24} sm={12} md={6}>
               <Card>
                 <Statistic
-                  title="當前排名"
-                  value={latestResult.rank || '-'}
+                  title="ROI"
+                  value={`${((latestResult.roi || 0) * 100).toFixed(2)}%`}
                   prefix={<TrophyOutlined />}
-                  valueStyle={{ color: '#1890ff' }}
+                  valueStyle={{ color: (latestResult.roi || 0) > 0 ? '#52c41a' : '#ff4d4f' }}
                 />
               </Card>
             </Col>

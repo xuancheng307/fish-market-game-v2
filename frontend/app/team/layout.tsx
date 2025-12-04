@@ -57,11 +57,11 @@ export default function TeamLayout({
 
         // 獲取當天資訊
         const dayResponse = await api.getCurrentGameDay(gameResponse.data.id)
-        setGameDay(dayResponse.data)
+        setGameDay(dayResponse.data || null)
 
         // 獲取我的團隊資訊
         const teamResponse = await api.getMyTeamStatus(gameResponse.data.id)
-        setTeam(teamResponse.data)
+        setTeam(teamResponse.data || null)
 
         // 加入遊戲房間
         wsClient.joinGame(gameResponse.data.id)

@@ -6,7 +6,9 @@ export interface User {
   id: number
   username: string
   role: 'admin' | 'team'
+  displayName?: string
   createdAt: string
+  updatedAt?: string
 }
 
 export interface Game {

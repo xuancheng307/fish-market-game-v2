@@ -117,7 +117,7 @@ export default function CreateGamePage() {
               style={{ width: 200 }}
               addonBefore="$"
               formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-              parser={(value) => value!.replace(/\$\s?|(,*)/g, '')}
+              parser={(value) => Number(value!.replace(/\$\s?|(,*)/g, '')) as unknown as 0}
             />
           </Form.Item>
 
