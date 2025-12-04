@@ -49,19 +49,19 @@ class Team {
             user_id,
             team_name,
             team_number = null,
-            current_budget,
+            cash,
             initial_budget
         } = teamData;
 
         const result = await query(
             `INSERT INTO game_participants (
                 game_id, user_id, team_name, team_number,
-                current_budget, initial_budget,
+                cash, initial_budget,
                 total_loan, total_loan_principal,
                 fish_a_inventory, fish_b_inventory,
                 cumulative_profit, roi
             ) VALUES (?, ?, ?, ?, ?, ?, 0, 0, 0, 0, 0, 0)`,
-            [game_id, user_id, team_name, team_number, current_budget, initial_budget]
+            [game_id, user_id, team_name, team_number, cash, initial_budget]
         );
 
         return await this.findById(result.insertId);
@@ -72,16 +72,16 @@ class Team {
      */
     static async updateFinance(id, data) {
         const {
-            current_budget,
+            cash,
             total_loan,
             total_loan_principal
         } = data;
 
         await query(
             `UPDATE game_participants
-             SET current_budget = ?, total_loan = ?, total_loan_principal = ?
+             SET cash = ?, total_loan = ?, total_loan_principal = ?
              WHERE id = ?`,
-            [current_budget, total_loan, total_loan_principal, id]
+            [cash, total_loan, total_loan_principal, id]
         );
 
         return await this.findById(id);
@@ -130,7 +130,7 @@ class Team {
      */
     static async update(id, data) {
         const allowedFields = [
-            'current_budget', 'total_loan', 'total_loan_principal',
+            'cash', 'total_loan', 'total_loan_principal',
             'fish_a_inventory', 'fish_b_inventory',
             'cumulative_profit', 'roi'
         ];
@@ -166,7 +166,7 @@ class Team {
         if (!team) return null;
 
         return await this.update(id, {
-            current_budget: parseFloat(team.current_budget) + loanAmount,
+            cash: parseFloat(team.cash) + loanAmount,
             total_loan: parseFloat(team.total_loan) + loanAmount,
             total_loan_principal: parseFloat(team.total_loan_principal) + loanAmount
         });
@@ -180,7 +180,7 @@ class Team {
         if (!team) return null;
 
         return await this.update(id, {
-            current_budget: parseFloat(team.current_budget) - amount
+            cash: parseFloat(team.cash) - amount
         });
     }
 
@@ -192,7 +192,7 @@ class Team {
         if (!team) return null;
 
         return await this.update(id, {
-            current_budget: parseFloat(team.current_budget) + amount
+            cash: parseFloat(team.cash) + amount
         });
     }
 

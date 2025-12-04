@@ -142,8 +142,9 @@ function teamToApi(dbRow) {
         gameId: dbRow.game_id,
         userId: dbRow.user_id,
         teamName: dbRow.team_name,
+        teamNumber: dbRow.team_number,
 
-        currentBudget: parseFloat(dbRow.current_budget),
+        cash: parseFloat(dbRow.cash),
         initialBudget: parseFloat(dbRow.initial_budget),
         totalLoan: parseFloat(dbRow.total_loan),
         totalLoanPrincipal: parseFloat(dbRow.total_loan_principal),
@@ -165,6 +166,10 @@ function teamToApi(dbRow) {
 function bidToApi(dbRow) {
     if (!dbRow) return null;
 
+    const price = parseFloat(dbRow.price);
+    const quantityFulfilled = dbRow.quantity_fulfilled || 0;
+    const totalCost = price * quantityFulfilled;
+
     return {
         id: dbRow.id,
         gameId: dbRow.game_id,
@@ -175,9 +180,12 @@ function bidToApi(dbRow) {
         bidType: dbRow.bid_type,
         fishType: dbRow.fish_type,
 
-        price: parseFloat(dbRow.price),
+        price: price,
         quantitySubmitted: dbRow.quantity_submitted,
-        quantityFulfilled: dbRow.quantity_fulfilled,
+        quantityFulfilled: quantityFulfilled,
+
+        totalCost: totalCost,
+        failReason: null,  // 保留給未來教學功能使用
 
         status: dbRow.status,
 
@@ -198,25 +206,23 @@ function dailyResultToApi(dbRow) {
         teamId: dbRow.team_id,
         dayNumber: dbRow.day_number,
 
-        // 財務數據 (使用前端期望的欄位名稱)
-        totalRevenue: parseFloat(dbRow.revenue),  // revenue → totalRevenue
-        totalCost: parseFloat(dbRow.cost),  // cost → totalCost
-        dailyProfit: parseFloat(dbRow.profit),  // profit → dailyProfit
+        // 財務數據
+        totalRevenue: parseFloat(dbRow.revenue),
+        totalCost: parseFloat(dbRow.cost),
+        dailyProfit: parseFloat(dbRow.profit),
         interestPaid: parseFloat(dbRow.interest_paid),
         unsoldFee: parseFloat(dbRow.unsold_fee),
-        loanInterest: parseFloat(dbRow.interest_paid),  // 貸款利息別名
-        unsoldPenalty: parseFloat(dbRow.unsold_fee),  // 滯銷罰金別名
+        loanInterest: parseFloat(dbRow.interest_paid),
+        unsoldPenalty: parseFloat(dbRow.unsold_fee),
 
-        // 期末狀態 (使用前端期望的欄位名稱)
-        dayEndCash: parseFloat(dbRow.current_budget),  // current_budget → dayEndCash
-        currentBudget: parseFloat(dbRow.current_budget),  // 保留舊名稱以相容性
+        // 期末狀態
+        dayEndCash: parseFloat(dbRow.cash),
         totalLoan: parseFloat(dbRow.total_loan),
         fishAInventory: dbRow.fish_a_inventory,
         fishBInventory: dbRow.fish_b_inventory,
 
-        // 累計數據 (使用前端期望的欄位名稱)
-        accumulatedProfit: parseFloat(dbRow.cumulative_profit),  // cumulative_profit → accumulatedProfit
-        cumulativeProfit: parseFloat(dbRow.cumulative_profit),  // 保留舊名稱以相容性
+        // 累計數據
+        cumulativeProfit: parseFloat(dbRow.cumulative_profit),
         roi: parseFloat(dbRow.roi),
 
         // 交易量數據
@@ -229,7 +235,7 @@ function dailyResultToApi(dbRow) {
         fishAUnsold: dbRow.fish_a_unsold || 0,
         fishBUnsold: dbRow.fish_b_unsold || 0,
 
-        // 團隊編號 (如果有提供)
+        // 團隊編號
         teamNumber: dbRow.team_number || null,
 
         createdAt: dbRow.created_at

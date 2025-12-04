@@ -75,7 +75,7 @@ class SettlementService {
                 const transactionAmount = parseFloat(bid.price) * fulfilledQty;
 
                 await Team.update(team.id, {
-                    current_budget: parseFloat(team.current_budget) - transactionAmount,
+                    cash: parseFloat(team.cash) - transactionAmount,
                     [fishType === FISH_TYPE.A ? 'fish_a_inventory' : 'fish_b_inventory']:
                         (fishType === FISH_TYPE.A ? team.fish_a_inventory : team.fish_b_inventory) + fulfilledQty
                 });
@@ -173,7 +173,7 @@ class SettlementService {
             const unsoldFee = unsoldQty * unsoldFeePerKg;
 
             await Team.update(team.id, {
-                current_budget: parseFloat(team.current_budget) - unsoldFee,
+                cash: parseFloat(team.cash) - unsoldFee,
                 [fishType === FISH_TYPE.A ? 'fish_a_inventory' : 'fish_b_inventory']:
                     (fishType === FISH_TYPE.A ? team.fish_a_inventory : team.fish_b_inventory) - unsoldQty
             });
@@ -214,7 +214,7 @@ class SettlementService {
                 const revenue = price * fulfilledQty;
 
                 await Team.update(team.id, {
-                    current_budget: parseFloat(team.current_budget) + revenue,
+                    cash: parseFloat(team.cash) + revenue,
                     [fishType === FISH_TYPE.A ? 'fish_a_inventory' : 'fish_b_inventory']:
                         (fishType === FISH_TYPE.A ? team.fish_a_inventory : team.fish_b_inventory) - fulfilledQty
                 });
@@ -310,7 +310,7 @@ class SettlementService {
                 team_id: team.id,
                 day_number: dayNumber,
                 interest_paid: interestResult.interest,
-                current_budget: currentBudget,
+                cash: currentBudget,
                 total_loan: totalLoan,
                 fish_a_inventory: team.fish_a_inventory,
                 fish_b_inventory: team.fish_b_inventory,

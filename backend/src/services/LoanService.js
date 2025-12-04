@@ -37,10 +37,10 @@ class LoanService {
         const remainingLoanCapacity = Math.max(0, maxLoan - currentLoan);
 
         // 可用資金 = 現金 + 剩餘借貸額度
-        const availableFunds = parseFloat(team.current_budget) + remainingLoanCapacity;
+        const availableFunds = parseFloat(team.cash) + remainingLoanCapacity;
 
         return {
-            currentBudget: parseFloat(team.current_budget),
+            currentBudget: parseFloat(team.cash),
             totalLoan: currentLoan,
             maxLoan,
             remainingLoanCapacity,
@@ -58,7 +58,7 @@ class LoanService {
             throw new AppError('團隊不存在', ERROR_CODES.GAME_NOT_FOUND, 404);
         }
 
-        const currentBudget = parseFloat(team.current_budget);
+        const currentBudget = parseFloat(team.cash);
 
         // 1. 如果現金足夠，不需要借貸
         if (currentBudget >= requiredAmount) {
@@ -92,7 +92,7 @@ class LoanService {
 
         // 4. 執行借貸 (現金增加!)
         const updatedTeam = await Team.update(team.id, {
-            current_budget: currentBudget + loanNeeded,
+            cash: currentBudget + loanNeeded,
             total_loan: fundsInfo.totalLoan + loanNeeded,
             total_loan_principal: parseFloat(team.total_loan_principal) + loanNeeded
         });
@@ -100,7 +100,7 @@ class LoanService {
         return {
             borrowed: true,
             loanAmount: loanNeeded,
-            newBudget: parseFloat(updatedTeam.current_budget),
+            newBudget: parseFloat(updatedTeam.cash),
             totalLoan: parseFloat(updatedTeam.total_loan)
         };
     }
@@ -130,17 +130,17 @@ class LoanService {
         const newTotalLoan = totalLoan + interest;
 
         // 從現金扣除利息
-        const newBudget = parseFloat(team.current_budget) - interest;
+        const newBudget = parseFloat(team.cash) - interest;
 
         // 更新團隊狀態
         const updatedTeam = await Team.update(team.id, {
-            current_budget: newBudget,
+            cash: newBudget,
             total_loan: newTotalLoan
         });
 
         return {
             interest,
-            newBudget: parseFloat(updatedTeam.current_budget),
+            newBudget: parseFloat(updatedTeam.cash),
             newTotalLoan: parseFloat(updatedTeam.total_loan)
         };
     }

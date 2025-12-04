@@ -83,7 +83,7 @@ class GameService {
                         user_id: user.id,
                         team_name: teamName,
                         team_number: teamNumber,
-                        current_budget: initial_budget,
+                        cash: initial_budget,
                         initial_budget: initial_budget
                     });
                 }

@@ -36,24 +36,30 @@ export interface GameDay {
   gameId: number
   dayNumber: number
   status: 'pending' | 'buying_open' | 'buying_closed' | 'selling_open' | 'selling_closed' | 'settled'
-  buyingStartTime: string | null
-  buyingEndTime: string | null
-  sellingStartTime: string | null
-  sellingEndTime: string | null
-  settlementTime: string | null
+  fishASupply: number
+  fishARestaurantBudget: number
+  fishBSupply: number
+  fishBRestaurantBudget: number
+  createdAt: string
+  updatedAt: string
 }
 
 export interface Team {
   id: number
   gameId: number
   userId: number
+  teamName: string
   teamNumber: number
   cash: number
+  initialBudget: number
   totalLoan: number
+  totalLoanPrincipal: number
   fishAInventory: number
   fishBInventory: number
-  accumulatedProfit: number
+  cumulativeProfit: number
   roi: number
+  createdAt?: string
+  updatedAt?: string
 }
 
 export interface Bid {
@@ -91,7 +97,7 @@ export interface DailyResult {
   unsoldPenalty: number
   loanInterest: number
   dailyProfit: number
-  accumulatedProfit: number
+  cumulativeProfit: number
   roi: number
   teamNumber: number
 }

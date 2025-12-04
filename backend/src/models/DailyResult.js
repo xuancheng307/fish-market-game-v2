@@ -57,7 +57,7 @@ class DailyResult {
             profit = 0,
             interest_paid = 0,
             unsold_fee = 0,
-            current_budget,
+            cash,
             total_loan,
             fish_a_inventory = 0,
             fish_b_inventory = 0,
@@ -75,7 +75,7 @@ class DailyResult {
             `INSERT INTO daily_results (
                 game_id, game_day_id, team_id, day_number,
                 revenue, cost, profit, interest_paid, unsold_fee,
-                current_budget, total_loan,
+                cash, total_loan,
                 fish_a_inventory, fish_b_inventory,
                 fish_a_purchased, fish_a_sold, fish_b_purchased, fish_b_sold,
                 fish_a_unsold, fish_b_unsold,
@@ -84,7 +84,7 @@ class DailyResult {
             [
                 game_id, game_day_id, team_id, day_number,
                 revenue, cost, profit, interest_paid, unsold_fee,
-                current_budget, total_loan,
+                cash, total_loan,
                 fish_a_inventory, fish_b_inventory,
                 fish_a_purchased, fish_a_sold, fish_b_purchased, fish_b_sold,
                 fish_a_unsold, fish_b_unsold,
