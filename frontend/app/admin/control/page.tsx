@@ -14,12 +14,13 @@ import {
 import { api } from '@/lib/api'
 import { wsClient } from '@/lib/websocket'
 import { DAY_STATUS, STATUS_DISPLAY_TEXT } from '@/lib/constants'
-import type { Game, GameDay, Team } from '@/lib/types'
+import type { Game, GameDay, Team, Bid } from '@/lib/types'
 
 export default function GameControlPage() {
   const [game, setGame] = useState<Game | null>(null)
   const [gameDay, setGameDay] = useState<GameDay | null>(null)
   const [teams, setTeams] = useState<Team[]>([])
+  const [allBids, setAllBids] = useState<Bid[]>([])
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState(false)
 
@@ -39,10 +40,15 @@ export default function GameControlPage() {
         // 載入所有團隊
         const teamsResponse = await api.getAllTeams(gameResponse.data.id)
         setTeams(teamsResponse.data || [])
+
+        // 載入當前天數的所有投標記錄
+        const bidsResponse = await api.getAllBids(gameResponse.data.id, gameResponse.data.currentDay)
+        setAllBids(bidsResponse.data || [])
       } else {
         setGame(null)
         setGameDay(null)
         setTeams([])
+        setAllBids([])
       }
     } catch (error: any) {
       if (error?.error?.includes('沒有進行中的遊戲')) {
@@ -69,9 +75,14 @@ export default function GameControlPage() {
       loadGameData()
     })
 
+    wsClient.onBidSubmitted(() => {
+      loadGameData()
+    })
+
     return () => {
       wsClient.off('phaseChange')
       wsClient.off('gameUpdate')
+      wsClient.off('bidSubmitted')
     }
   }, [])
 
@@ -195,6 +206,39 @@ export default function GameControlPage() {
     return actionsMap[gameDay.status] ? [actionsMap[gameDay.status]] : []
   }
 
+  // 計算投標進度
+  const getBiddingProgress = () => {
+    if (!gameDay || !teams.length) return null
+
+    // 只在買入或賣出階段顯示進度
+    const isBiddingPhase = gameDay.status === DAY_STATUS.BUYING_OPEN || gameDay.status === DAY_STATUS.SELLING_OPEN
+    if (!isBiddingPhase) return null
+
+    const currentPhase = gameDay.status === DAY_STATUS.BUYING_OPEN ? 'buy' : 'sell'
+
+    // 篩選出當前階段的投標
+    const currentPhaseBids = allBids.filter(bid => bid.bidType === currentPhase)
+
+    // 獲取已投標的團隊 ID
+    const teamsBidded = new Set(currentPhaseBids.map(bid => bid.teamId))
+
+    // 分類團隊
+    const biddedTeams = teams.filter(team => teamsBidded.has(team.id))
+    const notBiddedTeams = teams.filter(team => !teamsBidded.has(team.id))
+
+    return {
+      phase: currentPhase,
+      phaseName: currentPhase === 'buy' ? '買入' : '賣出',
+      total: teams.length,
+      bidded: biddedTeams.length,
+      biddedTeams,
+      notBiddedTeams,
+      progress: Math.round((biddedTeams.length / teams.length) * 100)
+    }
+  }
+
+  const biddingProgress = getBiddingProgress()
+
   if (loading) {
     return <div>載入中...</div>
   }
@@ -306,6 +350,84 @@ export default function GameControlPage() {
             )}
           </Card>
         </Col>
+
+        {/* 投標進度卡片 */}
+        {biddingProgress && (
+          <Col xs={24}>
+            <Card
+              title={
+                <Space>
+                  <TeamOutlined />
+                  {biddingProgress.phaseName}投標進度
+                </Space>
+              }
+            >
+              <Row gutter={[16, 16]}>
+                <Col xs={24} sm={12} md={8}>
+                  <Statistic
+                    title="已投標團隊"
+                    value={biddingProgress.bidded}
+                    suffix={`/ ${biddingProgress.total}`}
+                    prefix={<CheckCircleOutlined />}
+                    valueStyle={{ color: '#3f8600' }}
+                  />
+                </Col>
+                <Col xs={24} sm={12} md={8}>
+                  <Statistic
+                    title="未投標團隊"
+                    value={biddingProgress.notBiddedTeams.length}
+                    suffix="隊"
+                    valueStyle={{ color: biddingProgress.notBiddedTeams.length > 0 ? '#cf1322' : '#3f8600' }}
+                  />
+                </Col>
+                <Col xs={24} sm={12} md={8}>
+                  <Statistic
+                    title="投標完成率"
+                    value={biddingProgress.progress}
+                    suffix="%"
+                    valueStyle={{ color: biddingProgress.progress === 100 ? '#3f8600' : '#faad14' }}
+                  />
+                </Col>
+              </Row>
+
+              {biddingProgress.notBiddedTeams.length > 0 && (
+                <Alert
+                  message="尚未投標的團隊"
+                  description={
+                    <Space wrap>
+                      {biddingProgress.notBiddedTeams.map(team => (
+                        <Tag key={team.id} color="red">
+                          {team.teamName}
+                        </Tag>
+                      ))}
+                    </Space>
+                  }
+                  type="warning"
+                  showIcon
+                  style={{ marginTop: 16 }}
+                />
+              )}
+
+              {biddingProgress.biddedTeams.length > 0 && (
+                <Alert
+                  message="已投標的團隊"
+                  description={
+                    <Space wrap>
+                      {biddingProgress.biddedTeams.map(team => (
+                        <Tag key={team.id} color="green">
+                          {team.teamName}
+                        </Tag>
+                      ))}
+                    </Space>
+                  }
+                  type="success"
+                  showIcon
+                  style={{ marginTop: 16 }}
+                />
+              )}
+            </Card>
+          </Col>
+        )}
 
         {/* 遊戲控制卡片 */}
         <Col xs={24}>
