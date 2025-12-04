@@ -177,19 +177,69 @@ class BidService {
             throw new AppError('只能修改待處理的投標', ERROR_CODES.INVALID_BID, 400);
         }
 
-        // 如果修改買入投標的數量或價格，需要重新計算借貸
+        // 處理買入投標的資金檢查
         if (bid.bid_type === BID_TYPE.BUY && (updates.price || updates.quantity)) {
-            const newPrice = updates.price || parseFloat(bid.price);
-            const newQuantity = updates.quantity || bid.quantity_submitted;
-            const newRequiredAmount = newPrice * newQuantity;
+            const oldPrice = parseFloat(bid.price);
+            const oldQuantity = bid.quantity_submitted;
+            const oldAmount = oldPrice * oldQuantity;
 
-            await LoanService.checkAndBorrow(team.id, newRequiredAmount);
+            const newPrice = updates.price !== undefined ? updates.price : oldPrice;
+            const newQuantity = updates.quantity !== undefined ? updates.quantity : oldQuantity;
+            const newAmount = newPrice * newQuantity;
+
+            // ⚠️ 只借差額，不是全額
+            const difference = newAmount - oldAmount;
+
+            if (difference > 0) {
+                // 需要額外借款
+                await LoanService.checkAndBorrow(team.id, difference);
+            }
+            // difference < 0 時不處理退款（遊戲規則：借了就是借了）
         }
 
-        // 更新投標（此處簡化，實際需要更複雜的邏輯）
-        // ...
+        // 處理賣出投標的庫存檢查
+        if (bid.bid_type === BID_TYPE.SELL && updates.quantity !== undefined) {
+            const inventoryField = bid.fish_type === 'A' ? 'fish_a_inventory' : 'fish_b_inventory';
+            const currentInventory = team[inventoryField];
 
-        return bid;
+            if (currentInventory < updates.quantity) {
+                throw new AppError(
+                    '庫存不足',
+                    ERROR_CODES.INSUFFICIENT_INVENTORY,
+                    400,
+                    {
+                        required: updates.quantity,
+                        available: currentInventory,
+                        fishType: bid.fish_type
+                    }
+                );
+            }
+        }
+
+        // 檢查底價限制（買入投標）
+        if (bid.bid_type === BID_TYPE.BUY && updates.price !== undefined) {
+            const game = await Game.findById(bid.game_id);
+            const floorPrice = bid.fish_type === 'A' ?
+                parseFloat(game.distributor_floor_price_a) :
+                parseFloat(game.distributor_floor_price_b);
+
+            if (updates.price < floorPrice) {
+                throw new AppError(
+                    `價格不得低於底價 $${floorPrice}`,
+                    ERROR_CODES.INVALID_PRICE,
+                    400,
+                    { fishType: bid.fish_type, price: updates.price, floorPrice }
+                );
+            }
+        }
+
+        // 執行更新
+        const updatedBid = await Bid.update(bidId, {
+            price: updates.price,
+            quantity_submitted: updates.quantity
+        });
+
+        return updatedBid;
     }
 
     /**

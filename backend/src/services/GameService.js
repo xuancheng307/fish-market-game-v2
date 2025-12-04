@@ -64,14 +64,18 @@ class GameService {
                     const teamName = team_names[i];
                     const teamNumber = i + 1; // 團隊編號從 1 開始
 
+                    // 預設帳號和密碼使用兩位數團隊編號 (01, 02, ..., 12)
+                    const teamNumberStr = String(teamNumber).padStart(2, '0');
+                    const username = teamNumberStr;
+                    const defaultPassword = teamNumberStr;
+
                     // 查找或創建用戶
-                    const username = teamName.toLowerCase().replace(/\s+/g, '');
                     let user = await User.findByUsername(username);
 
                     if (!user) {
                         user = await User.create({
                             username,
-                            password: 'password123', // 預設密碼
+                            password: defaultPassword, // 預設密碼為兩位數團隊編號
                             role: 'team',
                             display_name: teamName
                         });

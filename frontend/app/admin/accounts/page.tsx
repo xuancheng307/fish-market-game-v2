@@ -134,8 +134,8 @@ export default function AccountsPage() {
     },
     {
       title: '當前現金',
-      dataIndex: 'currentBudget',
-      key: 'currentBudget',
+      dataIndex: 'cash',
+      key: 'cash',
       width: 140,
       render: (budget: number) => (
         <span style={{ color: budget < 0 ? '#ff4d4f' : '#000' }}>
@@ -159,8 +159,8 @@ export default function AccountsPage() {
     },
     {
       title: '貸款金額',
-      dataIndex: 'loanAmount',
-      key: 'loanAmount',
+      dataIndex: 'totalLoan',
+      key: 'totalLoan',
       width: 140,
       render: (amount: number) => (
         <span style={{ color: amount > 0 ? '#ff4d4f' : '#52c41a' }}>
@@ -281,17 +281,17 @@ export default function AccountsPage() {
                   <span style={{
                     fontSize: 18,
                     fontWeight: 'bold',
-                    color: selectedTeam.currentBudget < 0 ? '#ff4d4f' : '#52c41a'
+                    color: selectedTeam.cash < 0 ? '#ff4d4f' : '#52c41a'
                   }}>
-                    ${selectedTeam.currentBudget.toLocaleString()}
+                    ${selectedTeam.cash.toLocaleString()}
                   </span>
                 </Descriptions.Item>
                 <Descriptions.Item label="貸款金額">
                   <span style={{
                     fontSize: 16,
-                    color: selectedTeam.loanAmount > 0 ? '#ff4d4f' : '#000'
+                    color: selectedTeam.totalLoan > 0 ? '#ff4d4f' : '#000'
                   }}>
-                    ${selectedTeam.loanAmount.toLocaleString()}
+                    ${selectedTeam.totalLoan.toLocaleString()}
                   </span>
                 </Descriptions.Item>
                 <Descriptions.Item label="A級魚庫存">

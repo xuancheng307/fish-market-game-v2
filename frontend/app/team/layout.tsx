@@ -15,6 +15,7 @@ import { api } from '@/lib/api'
 import { wsClient } from '@/lib/websocket'
 import { STATUS_DISPLAY_TEXT } from '@/lib/constants'
 import type { Game, GameDay, Team } from '@/lib/types'
+import ConnectionStatusIndicator from '@/components/ConnectionStatus'
 
 const { Header, Content } = Layout
 
@@ -140,6 +141,7 @@ export default function TeamLayout({
           </Col>
           <Col>
             <Space>
+              <ConnectionStatusIndicator />
               {game && (
                 <Tag color="green">
                   {game.gameName} - 第 {game.currentDay}/{game.totalDays} 天
@@ -168,18 +170,35 @@ export default function TeamLayout({
                 <Space direction="vertical" style={{ width: '100%' }}>
                   <Statistic
                     title="當前現金"
-                    value={team.currentBudget}
+                    value={team.cash}
                     prefix={<DollarOutlined />}
-                    suffix="元"
                     valueStyle={{
-                      color: team.currentBudget < 0 ? '#ff4d4f' : '#52c41a',
+                      color: team.cash < 0 ? '#ff4d4f' : '#52c41a',
                       fontSize: 24,
                     }}
                   />
-                  {team.loanAmount > 0 && (
+                  <Statistic
+                    title="累積收益"
+                    value={team.cumulativeProfit}
+                    prefix="$"
+                    valueStyle={{
+                      color: team.cumulativeProfit > 0 ? '#52c41a' : team.cumulativeProfit < 0 ? '#ff4d4f' : '#000',
+                      fontSize: 20,
+                    }}
+                  />
+                  <Statistic
+                    title="ROI"
+                    value={(team.roi * 100).toFixed(2)}
+                    suffix="%"
+                    valueStyle={{
+                      color: team.roi > 0 ? '#52c41a' : team.roi < 0 ? '#ff4d4f' : '#000',
+                      fontSize: 20,
+                    }}
+                  />
+                  {team.totalLoan > 0 && (
                     <Statistic
-                      title="貸款金額"
-                      value={team.loanAmount}
+                      title="總貸款"
+                      value={team.totalLoan}
                       prefix="$"
                       valueStyle={{ color: '#ff4d4f', fontSize: 18 }}
                     />

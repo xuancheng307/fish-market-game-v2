@@ -17,9 +17,10 @@ ADD COLUMN fish_a_unsold INT DEFAULT 0 COMMENT 'A級魚滯銷數量' AFTER fish_
 ADD COLUMN fish_b_unsold INT DEFAULT 0 COMMENT 'B級魚滯銷數量' AFTER fish_a_unsold;
 
 -- 2. 新增外鍵約束 (game_day_id → game_days.id)
-ALTER TABLE daily_results
-ADD CONSTRAINT fk_daily_results_game_day
-FOREIGN KEY (game_day_id) REFERENCES game_days(id) ON DELETE CASCADE;
+-- ⚠️ 已存在，跳過此語句
+-- ALTER TABLE daily_results
+-- ADD CONSTRAINT fk_daily_results_game_day
+-- FOREIGN KEY (game_day_id) REFERENCES game_days(id) ON DELETE CASCADE;
 
 -- 3. 新增 game_participants 表的團隊編號欄位
 ALTER TABLE game_participants

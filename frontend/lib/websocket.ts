@@ -5,14 +5,20 @@
 import { io, Socket } from 'socket.io-client'
 import { WS_URL, SOCKET_EVENTS } from './constants'
 
+export type ConnectionStatus = 'connected' | 'disconnected' | 'connecting' | 'reconnecting' | 'error'
+
 class WebSocketClient {
   private socket: Socket | null = null
   private gameId: number | null = null
+  private connectionStatus: ConnectionStatus = 'disconnected'
+  private statusCallbacks: Array<(status: ConnectionStatus) => void> = []
 
   connect(token: string): void {
     if (this.socket?.connected) {
       return
     }
+
+    this.setStatus('connecting')
 
     this.socket = io(WS_URL, {
       auth: {
@@ -20,21 +26,71 @@ class WebSocketClient {
       },
       transports: ['websocket', 'polling'],
       reconnection: true,
-      reconnectionAttempts: 5,
+      reconnectionAttempts: 10,
       reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      timeout: 10000,
     })
 
     this.socket.on('connect', () => {
       console.log('✅ WebSocket 已連接')
+      this.setStatus('connected')
+
+      // 重連後自動重新加入遊戲房間
+      if (this.gameId) {
+        console.log(`🔄 重新加入遊戲房間: ${this.gameId}`)
+        this.socket?.emit(SOCKET_EVENTS.JOIN_GAME, { gameId: this.gameId })
+      }
     })
 
-    this.socket.on('disconnect', () => {
-      console.log('❌ WebSocket 已斷開')
+    this.socket.on('disconnect', (reason) => {
+      console.log('❌ WebSocket 已斷開:', reason)
+      this.setStatus('disconnected')
+    })
+
+    this.socket.on('reconnect', (attemptNumber) => {
+      console.log(`🔄 WebSocket 重連成功 (嘗試次數: ${attemptNumber})`)
+      this.setStatus('connected')
+    })
+
+    this.socket.on('reconnect_attempt', (attemptNumber) => {
+      console.log(`🔄 嘗試重連 WebSocket (第 ${attemptNumber} 次)`)
+      this.setStatus('reconnecting')
+    })
+
+    this.socket.on('reconnect_error', (error) => {
+      console.error('❌ WebSocket 重連錯誤:', error)
+      this.setStatus('error')
+    })
+
+    this.socket.on('reconnect_failed', () => {
+      console.error('❌ WebSocket 重連失敗，已達最大重試次數')
+      this.setStatus('error')
     })
 
     this.socket.on('connect_error', (error) => {
       console.error('❌ WebSocket 連接錯誤:', error)
+      this.setStatus('error')
     })
+  }
+
+  private setStatus(status: ConnectionStatus): void {
+    this.connectionStatus = status
+    this.statusCallbacks.forEach(callback => callback(status))
+  }
+
+  onStatusChange(callback: (status: ConnectionStatus) => void): void {
+    this.statusCallbacks.push(callback)
+    // 立即調用一次以獲取當前狀態
+    callback(this.connectionStatus)
+  }
+
+  removeStatusCallback(callback: (status: ConnectionStatus) => void): void {
+    this.statusCallbacks = this.statusCallbacks.filter(cb => cb !== callback)
+  }
+
+  getStatus(): ConnectionStatus {
+    return this.connectionStatus
   }
 
   disconnect(): void {

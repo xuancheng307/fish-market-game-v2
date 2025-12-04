@@ -62,7 +62,7 @@ export default function HistoryPage() {
       width: 100,
       render: (status: string) => {
         const statusConfig: Record<string, { color: string; text: string }> = {
-          completed: { color: 'success', text: '已完成' },
+          finished: { color: 'success', text: '已完成' },
           force_ended: { color: 'error', text: '強制結束' },
         }
         const config = statusConfig[status] || { color: 'default', text: status }
@@ -228,8 +228,8 @@ export default function HistoryPage() {
                 <Descriptions column={2} bordered size="small">
                   <Descriptions.Item label="遊戲名稱">{selectedGame.gameName}</Descriptions.Item>
                   <Descriptions.Item label="狀態">
-                    <Tag color={selectedGame.status === 'completed' ? 'success' : 'error'}>
-                      {selectedGame.status === 'completed' ? '已完成' : '強制結束'}
+                    <Tag color={selectedGame.status === 'finished' ? 'success' : 'error'}>
+                      {selectedGame.status === 'finished' ? '已完成' : '強制結束'}
                     </Tag>
                   </Descriptions.Item>
                   <Descriptions.Item label="遊戲天數">{selectedGame.totalDays} 天</Descriptions.Item>
@@ -237,11 +237,11 @@ export default function HistoryPage() {
                   <Descriptions.Item label="初始預算">${selectedGame.initialBudget.toLocaleString()}</Descriptions.Item>
                   <Descriptions.Item label="貸款利率">{(selectedGame.loanInterestRate * 100).toFixed(1)}%</Descriptions.Item>
                   <Descriptions.Item label="最大借貸倍數">{selectedGame.maxLoanRatio}x</Descriptions.Item>
-                  <Descriptions.Item label="滯銷罰金率">{(selectedGame.unsoldPenaltyRate * 100).toFixed(1)}%</Descriptions.Item>
-                  <Descriptions.Item label="A級魚底價">${selectedGame.fishAFloorPrice}</Descriptions.Item>
-                  <Descriptions.Item label="A級魚目標價">${selectedGame.fishATargetPrice}</Descriptions.Item>
-                  <Descriptions.Item label="B級魚底價">${selectedGame.fishBFloorPrice}</Descriptions.Item>
-                  <Descriptions.Item label="B級魚目標價">${selectedGame.fishBTargetPrice}</Descriptions.Item>
+                  <Descriptions.Item label="滯銷費用">${selectedGame.unsoldFeePerKg}/kg</Descriptions.Item>
+                  <Descriptions.Item label="A級魚底價">${selectedGame.distributorFloorPriceA}</Descriptions.Item>
+                  <Descriptions.Item label="A級魚目標價">${selectedGame.targetPriceA}</Descriptions.Item>
+                  <Descriptions.Item label="B級魚底價">${selectedGame.distributorFloorPriceB}</Descriptions.Item>
+                  <Descriptions.Item label="B級魚目標價">${selectedGame.targetPriceB}</Descriptions.Item>
                   <Descriptions.Item label="買入投標時長">{selectedGame.buyingDuration} 秒</Descriptions.Item>
                   <Descriptions.Item label="賣出投標時長">{selectedGame.sellingDuration} 秒</Descriptions.Item>
                   <Descriptions.Item label="固定滯銷比例">{(selectedGame.fixedUnsoldRatio * 100).toFixed(1)}%</Descriptions.Item>

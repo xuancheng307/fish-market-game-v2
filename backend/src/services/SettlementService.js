@@ -133,7 +133,7 @@ class SettlementService {
         });
 
         if (bids.length === 0) {
-            return { totalSold: 0, totalRevenue: 0, totalUnsold: 0, totalUnsoldFee: 0 };
+            return { totalSold: 0, totalRevenue: 0, totalUnsold: 0, totalUnsoldPenalty: 0 };
         }
 
         // 2. 計算固定滯銷 (2.5%) - 最高價優先滯銷
@@ -164,22 +164,22 @@ class SettlementService {
         // 3. 處理滯銷費用
         const unsoldFeePerKg = parseFloat(game.unsold_fee_per_kg);
         let totalUnsold = 0;
-        let totalUnsoldFee = 0;
+        let totalUnsoldPenalty = 0;
 
         for (const [bidId, unsoldQty] of bidUnsoldMap.entries()) {
             const bid = bids.find(b => b.id === bidId);
             const team = await Team.findById(bid.team_id);
 
-            const unsoldFee = unsoldQty * unsoldFeePerKg;
+            const unsoldPenalty = unsoldQty * unsoldFeePerKg;
 
             await Team.update(team.id, {
-                cash: parseFloat(team.cash) - unsoldFee,
+                cash: parseFloat(team.cash) - unsoldPenalty,
                 [fishType === FISH_TYPE.A ? 'fish_a_inventory' : 'fish_b_inventory']:
                     (fishType === FISH_TYPE.A ? team.fish_a_inventory : team.fish_b_inventory) - unsoldQty
             });
 
             totalUnsold += unsoldQty;
-            totalUnsoldFee += unsoldFee;
+            totalUnsoldPenalty += unsoldPenalty;
         }
 
         // 4. 分配給餐廳買家
@@ -244,7 +244,7 @@ class SettlementService {
             totalSold,
             totalRevenue,
             totalUnsold,
-            totalUnsoldFee
+            totalUnsoldPenalty
         };
     }
 
@@ -262,34 +262,40 @@ class SettlementService {
             const interestResult = await LoanService.calculateAndDeductInterest(team.id, gameId);
 
             // 2. 計算累計損益
-            const currentBudget = interestResult.newBudget;
-            const totalLoan = interestResult.newTotalLoan;
-            const cumulativeProfit = currentBudget + totalLoan - parseFloat(game.initial_budget);
+            const cash = interestResult.cash;
+            const totalLoan = interestResult.totalLoan;
+            const cumulativeProfit = cash + totalLoan - parseFloat(game.initial_budget);
 
             // 3. 計算 ROI
             const totalInvestment = parseFloat(game.initial_budget) + parseFloat(team.total_loan_principal);
             const roi = totalInvestment > 0 ? (cumulativeProfit / totalInvestment) * 100 : 0;
 
-            // 4. 計算當日魚類交易量統計
+            // 4. 計算當日魚類交易量統計和財務數據
             const { BID_TYPE, FISH_TYPE } = require('../config/constants');
             const teamBids = await Bid.findByGameDay(gameId, dayNumber, { team_id: team.id });
 
             let fishAPurchased = 0, fishASold = 0, fishBPurchased = 0, fishBSold = 0;
+            let totalRevenue = 0, totalCost = 0;
 
             for (const bid of teamBids) {
                 const qty = bid.quantity_fulfilled || 0;
+                const price = parseFloat(bid.price);
+                const amount = price * qty;
+
                 if (bid.bid_type === BID_TYPE.BUY) {
                     if (bid.fish_type === FISH_TYPE.A) {
                         fishAPurchased += qty;
                     } else if (bid.fish_type === FISH_TYPE.B) {
                         fishBPurchased += qty;
                     }
+                    totalCost += amount;
                 } else if (bid.bid_type === BID_TYPE.SELL) {
                     if (bid.fish_type === FISH_TYPE.A) {
                         fishASold += qty;
                     } else if (bid.fish_type === FISH_TYPE.B) {
                         fishBSold += qty;
                     }
+                    totalRevenue += amount;
                 }
             }
 
@@ -297,20 +303,31 @@ class SettlementService {
             const fishAUnsold = Math.max(0, fishAPurchased - fishASold);
             const fishBUnsold = Math.max(0, fishBPurchased - fishBSold);
 
-            // 6. 更新團隊狀態
+            // 6. 計算滯銷費用
+            const unsoldFeePerKg = parseFloat(game.unsold_fee_per_kg);
+            const totalUnsoldFee = (fishAUnsold + fishBUnsold) * unsoldFeePerKg;
+
+            // 7. 計算當日利潤
+            const dailyProfit = totalRevenue - totalCost - totalUnsoldFee - interestResult.interest;
+
+            // 8. 更新團隊狀態
             await Team.update(team.id, {
                 cumulative_profit: cumulativeProfit,
                 roi: roi
             });
 
-            // 7. 保存每日結果（包含交易量統計、滯銷數量、game_day_id）
+            // 9. 保存每日結果（包含交易量統計、滯銷數量、財務數據、game_day_id）
             const dailyResult = await DailyResult.create({
                 game_id: gameId,
                 game_day_id: gameDay ? gameDay.id : null,
                 team_id: team.id,
                 day_number: dayNumber,
+                revenue: totalRevenue,
+                cost: totalCost,
+                profit: dailyProfit,
                 interest_paid: interestResult.interest,
-                cash: currentBudget,
+                unsold_fee: totalUnsoldFee,
+                cash: cash,
                 total_loan: totalLoan,
                 fish_a_inventory: team.fish_a_inventory,
                 fish_b_inventory: team.fish_b_inventory,
@@ -327,8 +344,8 @@ class SettlementService {
             results.push({
                 teamId: team.id,
                 teamName: team.team_name,
-                interestPaid: interestResult.interest,
-                currentBudget,
+                loanInterest: interestResult.interest,
+                cash,
                 totalLoan,
                 cumulativeProfit,
                 roi

@@ -3,7 +3,7 @@
  *
  * ⚠️ 核心商業邏輯：
  * 1. 借貸發生在投標時 (不是結算時!)
- * 2. 借貸時現金增加: currentBudget += loanNeeded
+ * 2. 借貸時現金增加: cash += loanNeeded
  * 3. 無退款機制: 借的錢持續計息直到遊戲結束
  */
 
@@ -31,17 +31,17 @@ class LoanService {
         const maxLoan = parseFloat(game.initial_budget) * parseFloat(game.max_loan_ratio);
 
         // 已使用的借貸
-        const currentLoan = parseFloat(team.total_loan);
+        const totalLoan = parseFloat(team.total_loan);
 
         // 剩餘可借貸額度
-        const remainingLoanCapacity = Math.max(0, maxLoan - currentLoan);
+        const remainingLoanCapacity = Math.max(0, maxLoan - totalLoan);
 
         // 可用資金 = 現金 + 剩餘借貸額度
         const availableFunds = parseFloat(team.cash) + remainingLoanCapacity;
 
         return {
-            currentBudget: parseFloat(team.cash),
-            totalLoan: currentLoan,
+            cash: parseFloat(team.cash),
+            totalLoan,
             maxLoan,
             remainingLoanCapacity,
             availableFunds
@@ -58,19 +58,19 @@ class LoanService {
             throw new AppError('團隊不存在', ERROR_CODES.GAME_NOT_FOUND, 404);
         }
 
-        const currentBudget = parseFloat(team.cash);
+        const cash = parseFloat(team.cash);
 
         // 1. 如果現金足夠，不需要借貸
-        if (currentBudget >= requiredAmount) {
+        if (cash >= requiredAmount) {
             return {
                 borrowed: false,
                 loanAmount: 0,
-                newBudget: currentBudget
+                cash: cash
             };
         }
 
         // 2. 現金不足，需要借貸
-        const loanNeeded = requiredAmount - currentBudget;
+        const loanNeeded = requiredAmount - cash;
 
         // 3. 檢查借貸額度是否足夠
         const fundsInfo = await this.calculateAvailableFunds(teamId);
@@ -82,17 +82,17 @@ class LoanService {
                 400,
                 {
                     required: requiredAmount,
-                    currentBudget: fundsInfo.currentBudget,
+                    cash: fundsInfo.cash,
                     available: fundsInfo.availableFunds,
                     maxLoan: fundsInfo.maxLoan,
-                    currentLoan: fundsInfo.totalLoan
+                    totalLoan: fundsInfo.totalLoan
                 }
             );
         }
 
         // 4. 執行借貸 (現金增加!)
         const updatedTeam = await Team.update(team.id, {
-            cash: currentBudget + loanNeeded,
+            cash: cash + loanNeeded,
             total_loan: fundsInfo.totalLoan + loanNeeded,
             total_loan_principal: parseFloat(team.total_loan_principal) + loanNeeded
         });
@@ -100,7 +100,7 @@ class LoanService {
         return {
             borrowed: true,
             loanAmount: loanNeeded,
-            newBudget: parseFloat(updatedTeam.cash),
+            cash: parseFloat(updatedTeam.cash),
             totalLoan: parseFloat(updatedTeam.total_loan)
         };
     }
@@ -130,18 +130,18 @@ class LoanService {
         const newTotalLoan = totalLoan + interest;
 
         // 從現金扣除利息
-        const newBudget = parseFloat(team.cash) - interest;
+        const cash = parseFloat(team.cash) - interest;
 
         // 更新團隊狀態
         const updatedTeam = await Team.update(team.id, {
-            cash: newBudget,
+            cash: cash,
             total_loan: newTotalLoan
         });
 
         return {
             interest,
-            newBudget: parseFloat(updatedTeam.cash),
-            newTotalLoan: parseFloat(updatedTeam.total_loan)
+            cash: parseFloat(updatedTeam.cash),
+            totalLoan: parseFloat(updatedTeam.total_loan)
         };
     }
 
@@ -153,7 +153,7 @@ class LoanService {
         const team = await Team.findById(teamId);
 
         return {
-            currentBudget: fundsInfo.currentBudget,
+            cash: fundsInfo.cash,
             totalLoan: fundsInfo.totalLoan,
             totalLoanPrincipal: parseFloat(team.total_loan_principal),
             maxLoan: fundsInfo.maxLoan,

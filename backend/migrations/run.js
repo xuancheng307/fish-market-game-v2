@@ -69,8 +69,11 @@ async function runMigrations() {
                     executedStatements++;
                     console.log(`[Migration] ✓ ${migrationFile} - 語句 ${i + 1}/${statements.length} 執行成功`);
                 } catch (error) {
-                    // 忽略 "table already exists" 和 "column already exists" 錯誤
-                    if (error.code === 'ER_TABLE_EXISTS_ERROR' || error.code === 'ER_DUP_FIELDNAME') {
+                    // 忽略 "table already exists", "column already exists", "duplicate key/constraint" 錯誤
+                    if (error.code === 'ER_TABLE_EXISTS_ERROR' ||
+                        error.code === 'ER_DUP_FIELDNAME' ||
+                        error.code === 'ER_DUP_KEYNAME' ||
+                        error.message.includes('Duplicate foreign key constraint')) {
                         console.log(`[Migration] ⚠ ${migrationFile} - 語句 ${i + 1}/${statements.length} - 已存在，跳過`);
                     } else {
                         console.error(`[Migration] ✗ ${migrationFile} - 語句 ${i + 1} 執行失敗:`, error.message);

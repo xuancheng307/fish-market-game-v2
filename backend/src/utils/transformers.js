@@ -212,8 +212,6 @@ function dailyResultToApi(dbRow) {
         totalRevenue: parseFloat(dbRow.revenue),
         totalCost: parseFloat(dbRow.cost),
         dailyProfit: parseFloat(dbRow.profit),
-        interestPaid: parseFloat(dbRow.interest_paid),
-        unsoldFee: parseFloat(dbRow.unsold_fee),
         loanInterest: parseFloat(dbRow.interest_paid),
         unsoldPenalty: parseFloat(dbRow.unsold_fee),
 

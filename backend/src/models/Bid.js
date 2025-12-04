@@ -127,6 +127,33 @@ class Bid {
         return await this.findById(id);
     }
 
+    static async update(id, updates) {
+        const fields = [];
+        const values = [];
+
+        if (updates.price !== undefined) {
+            fields.push('price = ?');
+            values.push(updates.price);
+        }
+
+        if (updates.quantity_submitted !== undefined) {
+            fields.push('quantity_submitted = ?');
+            values.push(updates.quantity_submitted);
+        }
+
+        if (fields.length === 0) {
+            return await this.findById(id);
+        }
+
+        values.push(id);
+        await query(
+            `UPDATE bids SET ${fields.join(', ')} WHERE id = ?`,
+            values
+        );
+
+        return await this.findById(id);
+    }
+
     static async delete(id) {
         await query('DELETE FROM bids WHERE id = ?', [id]);
     }

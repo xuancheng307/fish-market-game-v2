@@ -16,6 +16,7 @@ import {
   LogoutOutlined,
 } from '@ant-design/icons'
 import { wsClient } from '@/lib/websocket'
+import ConnectionStatusIndicator from '@/components/ConnectionStatus'
 
 const { Header, Sider, Content } = Layout
 
@@ -155,12 +156,15 @@ export default function AdminLayout({
           <div style={{ fontSize: 18, fontWeight: 600, color: '#1890ff' }}>
             管理員控制台
           </div>
-          <Dropdown menu={{ items: userMenuItems }} placement="bottomRight">
-            <div style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}>
-              <Avatar icon={<UserOutlined />} style={{ backgroundColor: '#1890ff' }} />
-              <span style={{ fontWeight: 500 }}>{username}</span>
-            </div>
-          </Dropdown>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            <ConnectionStatusIndicator />
+            <Dropdown menu={{ items: userMenuItems }} placement="bottomRight">
+              <div style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Avatar icon={<UserOutlined />} style={{ backgroundColor: '#1890ff' }} />
+                <span style={{ fontWeight: 500 }}>{username}</span>
+              </div>
+            </Dropdown>
+          </div>
         </Header>
         <Content style={{
           margin: '24px',

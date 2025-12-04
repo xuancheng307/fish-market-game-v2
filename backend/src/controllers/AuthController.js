@@ -6,14 +6,14 @@
 const User = require('../models/User');
 const { generateToken } = require('../middleware/auth');
 const { userToApi } = require('../utils/transformers');
-const { AppError } = require('../middleware/errorHandler');
+const { AppError, asyncHandler } = require('../middleware/errorHandler');
 const { ERROR_CODES } = require('../config/constants');
 
 class AuthController {
     /**
      * 登入
      */
-    static async login(req, res) {
+    static login = asyncHandler(async (req, res) => {
         const { username, password } = req.body;
 
         if (!username || !password) {
@@ -40,23 +40,23 @@ class AuthController {
                 token
             }
         });
-    }
+    });
 
     /**
      * 登出
      */
-    static async logout(req, res) {
+    static logout = asyncHandler(async (req, res) => {
         // JWT 無狀態，客戶端刪除 token 即可
         res.json({
             success: true,
             message: '登出成功'
         });
-    }
+    });
 
     /**
      * 獲取當前用戶資訊
      */
-    static async me(req, res) {
+    static me = asyncHandler(async (req, res) => {
         const user = await User.findById(req.user.id);
         if (!user) {
             throw new AppError('用戶不存在', ERROR_CODES.GAME_NOT_FOUND, 404);
@@ -69,12 +69,12 @@ class AuthController {
             success: true,
             data: userApi
         });
-    }
+    });
 
     /**
      * 重置密碼（管理員功能）
      */
-    static async resetPasswords(req, res) {
+    static resetPasswords = asyncHandler(async (req, res) => {
         const { userIds, newPassword } = req.body;
 
         if (!userIds || !Array.isArray(userIds) || !newPassword) {
@@ -96,7 +96,7 @@ class AuthController {
             message: '密碼重置完成',
             data: results
         });
-    }
+    });
 }
 
 module.exports = AuthController;
