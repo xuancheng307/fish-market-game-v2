@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Form, Input, Button, Card, message, Typography } from 'antd'
 import { UserOutlined, LockOutlined } from '@ant-design/icons'
 import { api } from '@/lib/api'
+import { getErrorMessage } from '@/lib/utils'
 import type { LoginRequest } from '@/lib/types'
 
 const { Title, Text } = Typography
@@ -38,7 +39,7 @@ export default function LoginPage() {
       }
     } catch (error: any) {
       console.error('登入失敗:', error)
-      message.error(error?.message || error?.error || '登入失敗，請檢查帳號密碼')
+      message.error(getErrorMessage(error, '登入失敗，請檢查帳號密碼'))
     } finally {
       setLoading(false)
     }

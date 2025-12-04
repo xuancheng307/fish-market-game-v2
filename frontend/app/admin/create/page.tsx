@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Form, Input, InputNumber, Button, Card, message, Typography, Divider, Space } from 'antd'
 import { PlusCircleOutlined, ReloadOutlined } from '@ant-design/icons'
 import { api } from '@/lib/api'
+import { getErrorMessage } from '@/lib/utils'
 import type { GameCreateParams } from '@/lib/types'
 
 const { Title, Paragraph, Text } = Typography
@@ -46,7 +47,7 @@ export default function CreateGamePage() {
       }, 1000)
     } catch (error: any) {
       console.error('創建遊戲失敗:', error)
-      message.error(error?.message || error?.error || '創建遊戲失敗')
+      message.error(getErrorMessage(error, '創建遊戲失敗'))
     } finally {
       setLoading(false)
     }

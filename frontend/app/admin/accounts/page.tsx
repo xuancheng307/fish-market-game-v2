@@ -10,6 +10,7 @@ import {
   CloseCircleOutlined
 } from '@ant-design/icons'
 import { api } from '@/lib/api'
+import { getErrorMessage } from '@/lib/utils'
 import type { Team } from '@/lib/types'
 
 export default function AccountsPage() {
@@ -62,7 +63,7 @@ export default function AccountsPage() {
           message.success(`第 ${team.teamNumber} 隊密碼已重置為預設值`)
           await loadTeams()
         } catch (error: any) {
-          message.error(error?.message || '重置密碼失敗')
+          message.error(getErrorMessage(error, '重置密碼失敗'))
         } finally {
           setResetLoading(false)
         }
@@ -85,7 +86,7 @@ export default function AccountsPage() {
           message.success('所有團隊密碼已重置為預設值')
           await loadTeams()
         } catch (error: any) {
-          message.error(error?.message || '重置所有密碼失敗')
+          message.error(getErrorMessage(error, '重置所有密碼失敗'))
         } finally {
           setResetLoading(false)
         }

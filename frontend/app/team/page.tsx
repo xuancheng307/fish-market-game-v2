@@ -15,6 +15,7 @@ import {
 } from '@ant-design/icons'
 import { api } from '@/lib/api'
 import { wsClient } from '@/lib/websocket'
+import { getErrorMessage } from '@/lib/utils'
 import { DAY_STATUS, BID_TYPE, FISH_TYPE } from '@/lib/constants'
 import type { Game, GameDay, Bid, Team, DailyResult } from '@/lib/types'
 
@@ -125,7 +126,7 @@ export default function TeamHomePage() {
       form.resetFields()
       await loadData()
     } catch (error: any) {
-      message.error(error?.message || error?.error || '投標提交失敗')
+      message.error(getErrorMessage(error, '投標提交失敗'))
     } finally {
       setSubmitting(false)
     }

@@ -17,6 +17,7 @@ import {
 } from '@ant-design/icons'
 import { api } from '@/lib/api'
 import { wsClient } from '@/lib/websocket'
+import { getErrorMessage } from '@/lib/utils'
 import { DAY_STATUS, STATUS_DISPLAY_TEXT } from '@/lib/constants'
 import type { Game, GameDay, Team, Bid, DailyResult } from '@/lib/types'
 
@@ -163,7 +164,7 @@ export default function GameControlPage() {
 
       await loadGameData()
     } catch (error: any) {
-      message.error(error?.message || error?.error || '操作失敗')
+      message.error(getErrorMessage(error, '操作失敗'))
     } finally {
       setActionLoading(false)
     }
@@ -182,7 +183,7 @@ export default function GameControlPage() {
           message.success(game.status === 'active' ? '遊戲已暫停' : '遊戲已恢復')
           await loadGameData()
         } catch (error: any) {
-          message.error(error?.message || '操作失敗')
+          message.error(getErrorMessage(error, '操作失敗'))
         }
       }
     })
@@ -203,7 +204,7 @@ export default function GameControlPage() {
           message.success('遊戲已強制結束')
           await loadGameData()
         } catch (error: any) {
-          message.error(error?.message || '操作失敗')
+          message.error(getErrorMessage(error, '操作失敗'))
         }
       }
     })
