@@ -12,9 +12,11 @@ export interface User {
 export interface Game {
   id: number
   gameName: string
+  description: string
+  status: 'pending' | 'active' | 'paused' | 'finished' | 'force_ended'
   totalDays: number
   currentDay: number
-  status: 'pending' | 'active' | 'paused' | 'finished' | 'force_ended'
+  numTeams: number
   initialBudget: number
   dailyInterestRate: number
   loanInterestRate: number
@@ -129,8 +131,10 @@ export interface BidSubmission {
 
 export interface GameCreateParams {
   gameName: string
+  description: string
   totalDays: number
   numTeams: number
+  teamNames: string[]
   initialBudget: number
   dailyInterestRate: number
   loanInterestRate: number

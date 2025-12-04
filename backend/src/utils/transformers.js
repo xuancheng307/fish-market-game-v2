@@ -76,7 +76,7 @@ function gameToApi(dbRow) {
         id: dbRow.id,
         gameName: dbRow.name,
         description: dbRow.description,
-        gameStatus: dbRow.status,
+        status: dbRow.status,
 
         totalDays: dbRow.total_days,
         currentDay: dbRow.current_day,
@@ -266,7 +266,7 @@ function apiToGame(apiData) {
     return {
         name: apiData.gameName,
         description: apiData.description,
-        status: apiData.gameStatus,
+        status: apiData.status,
 
         total_days: apiData.totalDays,
         current_day: apiData.currentDay,
