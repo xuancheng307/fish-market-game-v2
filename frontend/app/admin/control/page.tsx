@@ -525,9 +525,9 @@ export default function GameControlPage() {
               fixed: 'left',
               render: (_: any, record: DailyResult, index: number) => {
                 const icons = [
-                  <TrophyOutlined style={{ color: '#FFD700', fontSize: 24 }} />,
-                  <TrophyOutlined style={{ color: '#C0C0C0', fontSize: 22 }} />,
-                  <TrophyOutlined style={{ color: '#CD7F32', fontSize: 20 }} />,
+                  <TrophyOutlined key="gold" style={{ color: '#FFD700', fontSize: 24 }} />,
+                  <TrophyOutlined key="silver" style={{ color: '#C0C0C0', fontSize: 22 }} />,
+                  <TrophyOutlined key="bronze" style={{ color: '#CD7F32', fontSize: 20 }} />,
                 ]
                 return (
                   <div style={{ textAlign: 'center' }}>

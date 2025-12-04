@@ -54,26 +54,31 @@ export default function BidsPage() {
 
   useEffect(() => {
     loadGameData()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
-    // 監聽投標提交
-    wsClient.onBidSubmitted(() => {
+  // 監聽 WebSocket 事件
+  useEffect(() => {
+    const handleBidSubmitted = () => {
       if (game && selectedDay) {
         loadBids(game.id, selectedDay)
       }
-    })
+    }
 
-    // 監聽結算完成
-    wsClient.onSettlementComplete(() => {
+    const handleSettlementComplete = () => {
       if (game && selectedDay) {
         loadBids(game.id, selectedDay)
       }
-    })
+    }
+
+    wsClient.onBidSubmitted(handleBidSubmitted)
+    wsClient.onSettlementComplete(handleSettlementComplete)
 
     return () => {
       wsClient.off('bidSubmitted')
       wsClient.off('settlementComplete')
     }
-  }, [])
+  }, [game, selectedDay])
 
   useEffect(() => {
     if (game?.id) {
@@ -86,7 +91,8 @@ export default function BidsPage() {
     if (game && selectedDay) {
       loadBids(game.id, selectedDay)
     }
-  }, [selectedDay])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [game?.id, selectedDay])
 
   // 過濾投標記錄
   const filteredBids = bids.filter(bid => {

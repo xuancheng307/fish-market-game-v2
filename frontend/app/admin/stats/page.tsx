@@ -85,9 +85,9 @@ export default function StatsPage() {
       width: 70,
       render: (_: any, record: DailyResult, index: number) => {
         const icons = [
-          <TrophyOutlined style={{ color: '#FFD700', fontSize: 20 }} />,
-          <TrophyOutlined style={{ color: '#C0C0C0', fontSize: 18 }} />,
-          <TrophyOutlined style={{ color: '#CD7F32', fontSize: 16 }} />,
+          <TrophyOutlined key="gold" style={{ color: '#FFD700', fontSize: 20 }} />,
+          <TrophyOutlined key="silver" style={{ color: '#C0C0C0', fontSize: 18 }} />,
+          <TrophyOutlined key="bronze" style={{ color: '#CD7F32', fontSize: 16 }} />,
         ]
         return index < 3 ? icons[index] : index + 1
       },
