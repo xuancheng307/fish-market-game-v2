@@ -21,8 +21,9 @@ export default function LoginPage() {
       // API 回傳結構: { success, message, data: { user, token } }
       const { user, token } = response.data
 
-      // 儲存 token 和用戶角色
+      // 儲存 token 和用戶資訊
       localStorage.setItem('token', token)
+      localStorage.setItem('user', JSON.stringify(user))
       localStorage.setItem('userRole', user.role)
       localStorage.setItem('userId', String(user.id))
       localStorage.setItem('username', user.username)

@@ -108,6 +108,10 @@ export default function TeamLayout({
   const handleLogout = () => {
     localStorage.removeItem('token')
     localStorage.removeItem('user')
+    localStorage.removeItem('userRole')
+    localStorage.removeItem('userId')
+    localStorage.removeItem('username')
+    wsClient.disconnect()
     message.success('登出成功')
     router.push('/login')
   }
