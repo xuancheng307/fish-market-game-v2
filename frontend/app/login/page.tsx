@@ -18,16 +18,19 @@ export default function LoginPage() {
     try {
       const response = await api.login(values)
 
+      // API 回傳結構: { success, message, data: { user, token } }
+      const { user, token } = response.data
+
       // 儲存 token 和用戶角色
-      localStorage.setItem('token', response.token)
-      localStorage.setItem('userRole', response.user.role)
-      localStorage.setItem('userId', String(response.user.id))
-      localStorage.setItem('username', response.user.username)
+      localStorage.setItem('token', token)
+      localStorage.setItem('userRole', user.role)
+      localStorage.setItem('userId', String(user.id))
+      localStorage.setItem('username', user.username)
 
       message.success('登入成功！')
 
       // 根據角色導向不同頁面
-      if (response.user.role === 'admin') {
+      if (user.role === 'admin') {
         router.push('/admin')
       } else {
         router.push('/team')
