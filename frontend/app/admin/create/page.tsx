@@ -16,8 +16,10 @@ export default function CreateGamePage() {
 
   const defaultValues: GameCreateParams = {
     gameName: `魚市場遊戲-${new Date().toLocaleDateString('zh-TW')}`,
+    description: '',
     totalDays: 10,
     numTeams: 6,
+    teamNames: ['第 01 組', '第 02 組', '第 03 組', '第 04 組', '第 05 組', '第 06 組'],
     initialBudget: 100000,
     dailyInterestRate: 0.0,
     loanInterestRate: 0.03,
