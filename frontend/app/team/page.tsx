@@ -13,13 +13,14 @@ import {
 import { api } from '@/lib/api'
 import { wsClient } from '@/lib/websocket'
 import { DAY_STATUS, BID_TYPE, FISH_TYPE } from '@/lib/constants'
-import type { Game, GameDay, Bid } from '@/lib/types'
+import type { Game, GameDay, Bid, Team } from '@/lib/types'
 
 export default function TeamHomePage() {
   const [form] = Form.useForm()
   const [game, setGame] = useState<Game | null>(null)
   const [gameDay, setGameDay] = useState<GameDay | null>(null)
   const [myBids, setMyBids] = useState<Bid[]>([])
+  const [myTeam, setMyTeam] = useState<Team | null>(null)
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
 
@@ -34,6 +35,10 @@ export default function TeamHomePage() {
 
         const dayResponse = await api.getCurrentGameDay(gameResponse.data.id)
         setGameDay(dayResponse.data)
+
+        // 載入我的團隊資訊（包含庫存）
+        const teamResponse = await api.getTeamInfo(gameResponse.data.id)
+        setMyTeam(teamResponse.data)
 
         // 載入我的投標記錄
         const bidsResponse = await api.getMyBids(gameResponse.data.id, gameResponse.data.currentDay)
@@ -243,6 +248,55 @@ export default function TeamHomePage() {
           </Card>
         )}
 
+        {/* 庫存提醒（賣出階段顯示） */}
+        {canSell && myTeam && (
+          <Card title={<><ShoppingCartOutlined /> 當前庫存</>} size="small">
+            <Row gutter={16}>
+              <Col xs={24} sm={12} md={6}>
+                <Statistic
+                  title="A級魚庫存"
+                  value={myTeam.fishAInventory}
+                  suffix="kg"
+                  valueStyle={{ color: myTeam.fishAInventory > 0 ? '#3f8600' : '#cf1322' }}
+                />
+              </Col>
+              <Col xs={24} sm={12} md={6}>
+                <Statistic
+                  title="B級魚庫存"
+                  value={myTeam.fishBInventory}
+                  suffix="kg"
+                  valueStyle={{ color: myTeam.fishBInventory > 0 ? '#3f8600' : '#cf1322' }}
+                />
+              </Col>
+              <Col xs={24} sm={12} md={6}>
+                <Statistic
+                  title="當前現金"
+                  value={myTeam.cash}
+                  prefix="$"
+                  valueStyle={{ color: myTeam.cash > 0 ? '#3f8600' : '#cf1322' }}
+                />
+              </Col>
+              <Col xs={24} sm={12} md={6}>
+                <Statistic
+                  title="累積收益"
+                  value={myTeam.cumulativeProfit}
+                  prefix="$"
+                  valueStyle={{ color: myTeam.cumulativeProfit > 0 ? '#3f8600' : myTeam.cumulativeProfit < 0 ? '#cf1322' : '#000' }}
+                />
+              </Col>
+            </Row>
+            {(myTeam.fishAInventory === 0 && myTeam.fishBInventory === 0) && (
+              <Alert
+                message="庫存不足"
+                description="您目前沒有任何庫存可以賣出，無需進行賣出投標。"
+                type="warning"
+                showIcon
+                style={{ marginTop: 16 }}
+              />
+            )}
+          </Card>
+        )}
+
         {/* 投標表單 */}
         {canBid && game && (
           <Card
@@ -346,6 +400,15 @@ export default function TeamHomePage() {
                   message="提示"
                   description="買入投標時，如果現金不足會自動進行借貸。請注意借貸會產生利息！"
                   type="info"
+                  showIcon
+                />
+              )}
+
+              {canSell && myTeam && (
+                <Alert
+                  message="庫存提示"
+                  description={`當前庫存：A級魚 ${myTeam.fishAInventory} kg，B級魚 ${myTeam.fishBInventory} kg。請確保投標數量不超過現有庫存！`}
+                  type={myTeam.fishAInventory === 0 && myTeam.fishBInventory === 0 ? 'warning' : 'info'}
                   showIcon
                 />
               )}
