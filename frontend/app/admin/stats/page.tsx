@@ -115,15 +115,15 @@ export default function StatsPage() {
     },
     {
       title: '累積收益',
-      dataIndex: 'accumulatedProfit',
-      key: 'accumulatedProfit',
+      dataIndex: 'cumulativeProfit',
+      key: 'cumulativeProfit',
       width: 140,
       render: (profit: number) => (
         <span style={{ color: profit > 0 ? '#52c41a' : profit < 0 ? '#ff4d4f' : '#000' }}>
           ${profit.toLocaleString()}
         </span>
       ),
-      sorter: (a: DailyResult, b: DailyResult) => b.accumulatedProfit - a.accumulatedProfit,
+      sorter: (a: DailyResult, b: DailyResult) => b.cumulativeProfit - a.cumulativeProfit,
     },
     {
       title: '當日收益',
@@ -270,7 +270,7 @@ export default function StatsPage() {
   const getCumulativeProfitChartOption = () => {
     if (!dailyResults.length) return {}
 
-    const sortedResults = [...dailyResults].sort((a, b) => b.accumulatedProfit - a.accumulatedProfit)
+    const sortedResults = [...dailyResults].sort((a, b) => b.cumulativeProfit - a.cumulativeProfit)
 
     return {
       title: {
@@ -303,7 +303,7 @@ export default function StatsPage() {
         {
           name: '累積收益',
           type: 'bar',
-          data: sortedResults.map(r => r.accumulatedProfit),
+          data: sortedResults.map(r => r.cumulativeProfit),
           itemStyle: {
             color: (params: any) => {
               return params.value > 0 ? '#1890ff' : params.value < 0 ? '#ff4d4f' : '#d9d9d9'

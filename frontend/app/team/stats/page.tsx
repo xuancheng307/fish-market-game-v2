@@ -90,7 +90,7 @@ export default function TeamStatsPage() {
         {
           name: '累積收益',
           type: 'line',
-          data: sortedResults.map(r => r.accumulatedProfit),
+          data: sortedResults.map(r => r.cumulativeProfit),
           smooth: true,
           itemStyle: {
             color: '#1890ff',
@@ -212,8 +212,8 @@ export default function TeamStatsPage() {
     },
     {
       title: '累積收益',
-      dataIndex: 'accumulatedProfit',
-      key: 'accumulatedProfit',
+      dataIndex: 'cumulativeProfit',
+      key: 'cumulativeProfit',
       width: 140,
       render: (profit: number) => (
         <span style={{ color: profit > 0 ? '#52c41a' : profit < 0 ? '#ff4d4f' : '#000', fontWeight: 'bold' }}>
@@ -382,10 +382,10 @@ export default function TeamStatsPage() {
               <Card>
                 <Statistic
                   title="累積收益"
-                  value={latestResult.accumulatedProfit}
+                  value={latestResult.cumulativeProfit}
                   prefix={<DollarOutlined />}
                   valueStyle={{
-                    color: latestResult.accumulatedProfit > 0 ? '#52c41a' : '#ff4d4f',
+                    color: latestResult.cumulativeProfit > 0 ? '#52c41a' : '#ff4d4f',
                   }}
                 />
               </Card>

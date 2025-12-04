@@ -226,16 +226,16 @@ export default function TeamHomePage() {
               <Col xs={24} md={12}>
                 <Card size="small" style={{ background: '#f5f0ff' }}>
                   <Descriptions title="A級魚" column={2} size="small">
-                    <Descriptions.Item label="底價">${game.fishAFloorPrice}</Descriptions.Item>
-                    <Descriptions.Item label="目標價">${game.fishATargetPrice}</Descriptions.Item>
+                    <Descriptions.Item label="底價（總代理）">${game.distributorFloorPriceA}</Descriptions.Item>
+                    <Descriptions.Item label="目標價（預算參考）">${game.targetPriceA}</Descriptions.Item>
                   </Descriptions>
                 </Card>
               </Col>
               <Col xs={24} md={12}>
                 <Card size="small" style={{ background: '#fff7e6' }}>
                   <Descriptions title="B級魚" column={2} size="small">
-                    <Descriptions.Item label="底價">${game.fishBFloorPrice}</Descriptions.Item>
-                    <Descriptions.Item label="目標價">${game.fishBTargetPrice}</Descriptions.Item>
+                    <Descriptions.Item label="底價（總代理）">${game.distributorFloorPriceB}</Descriptions.Item>
+                    <Descriptions.Item label="目標價（預算參考）">${game.targetPriceB}</Descriptions.Item>
                   </Descriptions>
                 </Card>
               </Col>

@@ -153,8 +153,8 @@ export default function HistoryPage() {
     },
     {
       title: '累積收益',
-      dataIndex: 'accumulatedProfit',
-      key: 'accumulatedProfit',
+      dataIndex: 'cumulativeProfit',
+      key: 'cumulativeProfit',
       width: 140,
       render: (profit: number) => (
         <span style={{
