@@ -176,6 +176,8 @@ function bidToApi(dbRow) {
         gameDayId: dbRow.game_day_id,
         dayNumber: dbRow.day_number,
         teamId: dbRow.team_id,
+        teamName: dbRow.team_name,
+        teamNumber: dbRow.team_number,
 
         bidType: dbRow.bid_type,
         fishType: dbRow.fish_type,

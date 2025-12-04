@@ -70,6 +70,8 @@ export interface Bid {
   gameDayId: number
   dayNumber: number
   teamId: number
+  teamName: string
+  teamNumber: number
   bidType: 'buy' | 'sell'
   fishType: 'A' | 'B'
   price: number

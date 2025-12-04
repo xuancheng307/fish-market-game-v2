@@ -9,53 +9,62 @@ const { BID_STATUS } = require('../config/constants');
 class Bid {
     static async findById(id) {
         const rows = await query(
-            'SELECT * FROM bids WHERE id = ?',
+            `SELECT b.*, gp.team_name, gp.team_number
+             FROM bids b
+             LEFT JOIN game_participants gp ON b.team_id = gp.id
+             WHERE b.id = ?`,
             [id]
         );
         return rows[0] || null;
     }
 
     static async findByGameDay(gameId, dayNumber, filters = {}) {
-        let sql = 'SELECT * FROM bids WHERE game_id = ? AND day_number = ?';
+        let sql = `SELECT b.*, gp.team_name, gp.team_number
+                   FROM bids b
+                   LEFT JOIN game_participants gp ON b.team_id = gp.id
+                   WHERE b.game_id = ? AND b.day_number = ?`;
         const params = [gameId, dayNumber];
 
         if (filters.bid_type) {
-            sql += ' AND bid_type = ?';
+            sql += ' AND b.bid_type = ?';
             params.push(filters.bid_type);
         }
 
         if (filters.fish_type) {
-            sql += ' AND fish_type = ?';
+            sql += ' AND b.fish_type = ?';
             params.push(filters.fish_type);
         }
 
         if (filters.team_id) {
-            sql += ' AND team_id = ?';
+            sql += ' AND b.team_id = ?';
             params.push(filters.team_id);
         }
 
         // 排序: 買入按價格降序, 賣出按價格升序, 相同價格早提交優先
         if (filters.bid_type === 'buy') {
-            sql += ' ORDER BY price DESC, created_at ASC';
+            sql += ' ORDER BY b.price DESC, b.created_at ASC';
         } else if (filters.bid_type === 'sell') {
-            sql += ' ORDER BY price ASC, created_at ASC';
+            sql += ' ORDER BY b.price ASC, b.created_at ASC';
         } else {
-            sql += ' ORDER BY created_at ASC';
+            sql += ' ORDER BY b.created_at ASC';
         }
 
         return await query(sql, params);
     }
 
     static async findByTeam(teamId, gameId = null) {
-        let sql = 'SELECT * FROM bids WHERE team_id = ?';
+        let sql = `SELECT b.*, gp.team_name, gp.team_number
+                   FROM bids b
+                   LEFT JOIN game_participants gp ON b.team_id = gp.id
+                   WHERE b.team_id = ?`;
         const params = [teamId];
 
         if (gameId) {
-            sql += ' AND game_id = ?';
+            sql += ' AND b.game_id = ?';
             params.push(gameId);
         }
 
-        sql += ' ORDER BY created_at DESC';
+        sql += ' ORDER BY b.created_at DESC';
         return await query(sql, params);
     }
 
