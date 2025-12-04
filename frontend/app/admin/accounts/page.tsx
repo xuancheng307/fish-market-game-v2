@@ -58,7 +58,7 @@ export default function AccountsPage() {
       onOk: async () => {
         try {
           setResetLoading(true)
-          await api.resetTeamPassword(team.userId)
+          await api.resetTeamPassword(team.userId, team.teamNumber)
           message.success(`第 ${team.teamNumber} 隊密碼已重置為預設值`)
           await loadTeams()
         } catch (error: any) {

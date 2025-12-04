@@ -97,6 +97,31 @@ class AuthController {
             data: results
         });
     });
+
+    /**
+     * 重置所有團隊密碼（管理員功能）
+     */
+    static resetAllPasswords = asyncHandler(async (req, res) => {
+        // 獲取所有團隊用戶
+        const teamUsers = await User.getAllTeams();
+
+        const results = [];
+        for (const user of teamUsers) {
+            try {
+                // 密碼重置為帳號名稱（01, 02, ...）
+                await User.updatePassword(user.id, user.username);
+                results.push({ userId: user.id, username: user.username, success: true });
+            } catch (error) {
+                results.push({ userId: user.id, username: user.username, success: false, error: error.message });
+            }
+        }
+
+        res.json({
+            success: true,
+            message: '所有團隊密碼已重置',
+            data: results
+        });
+    });
 }
 
 module.exports = AuthController;

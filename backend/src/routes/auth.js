@@ -16,5 +16,6 @@ router.get('/me', verifyToken, AuthController.me);
 
 // 管理員功能
 router.post('/reset-passwords', verifyToken, requireAdmin, AuthController.resetPasswords);
+router.post('/reset-all-passwords', verifyToken, requireAdmin, AuthController.resetAllPasswords);
 
 module.exports = router;

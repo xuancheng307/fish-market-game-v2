@@ -68,8 +68,19 @@ class ApiClient {
     return this.client.post('/auth/update-password', { userId, newPassword })
   }
 
-  async resetPasswords(gameId: number): Promise<ApiResponse> {
-    return this.client.post('/auth/reset-passwords', { gameId })
+  async resetPasswords(userIds: number[], newPassword: string): Promise<ApiResponse> {
+    return this.client.post('/auth/reset-passwords', { userIds, newPassword })
+  }
+
+  async resetTeamPassword(userId: number, teamNumber: number): Promise<ApiResponse> {
+    // 重置單一用戶密碼為其團隊編號（兩位數，如 01, 02）
+    const newPassword = String(teamNumber).padStart(2, '0')
+    return this.client.post('/auth/reset-passwords', { userIds: [userId], newPassword })
+  }
+
+  async resetAllPasswords(): Promise<ApiResponse> {
+    // 獲取所有團隊用戶並重置密碼
+    return this.client.post('/auth/reset-all-passwords', {})
   }
 
   // ============ 遊戲管理 (管理員) ============
