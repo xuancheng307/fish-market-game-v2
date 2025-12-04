@@ -42,7 +42,7 @@ export default function GameControlPage() {
 
         // 載入當天資訊
         const dayResponse = await api.getCurrentGameDay(gameResponse.data.id)
-        setGameDay(dayResponse.data)
+        setGameDay(dayResponse.data || null)
 
         // 載入所有團隊
         const teamsResponse = await api.getAllTeams(gameResponse.data.id)
