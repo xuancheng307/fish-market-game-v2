@@ -201,10 +201,9 @@ CREATE TABLE IF NOT EXISTS daily_results (
 -- ========================================
 -- 7. 初始化管理員帳號
 -- ========================================
--- 密碼: admin (使用 bcrypt hash)
--- $2b$10$YourHashHere - 實際使用時需要更新
+-- 密碼: 123 (使用 bcrypt hash)
 INSERT INTO users (username, password_hash, role, display_name)
-VALUES ('admin', '$2b$10$YourHashHere', 'admin', '系統管理員')
+VALUES ('admin', '$2b$10$wD74VgOffFAa6jzm9qMfbOSf/T7sJrTtGVABo9bAQw7DSvXjJQhRK', 'admin', '系統管理員')
 ON DUPLICATE KEY UPDATE username = username;
 
 -- ========================================
