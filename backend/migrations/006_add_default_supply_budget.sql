@@ -5,32 +5,19 @@
 -- 說明:
 --   - 在 games 表新增預設每日供給量和餐廳資金池
 --   - 這些值在創建遊戲時設定，每天開始時自動帶入作為預設值
+--   - 使用 MySQL 8.x 相容語法
 
 -- ========================================
--- 1. 新增 A級魚預設每日供給量
+-- 新增所有欄位（若已存在會報錯但被 run.js 忽略）
 -- ========================================
 ALTER TABLE games
-ADD COLUMN IF NOT EXISTS default_fish_a_supply INT NOT NULL DEFAULT 100;
+ADD COLUMN default_fish_a_supply INT NOT NULL DEFAULT 100;
 
--- ========================================
--- 2. 新增 B級魚預設每日供給量
--- ========================================
 ALTER TABLE games
-ADD COLUMN IF NOT EXISTS default_fish_b_supply INT NOT NULL DEFAULT 100;
+ADD COLUMN default_fish_b_supply INT NOT NULL DEFAULT 100;
 
--- ========================================
--- 3. 新增 A級魚餐廳預設每日資金池
--- ========================================
 ALTER TABLE games
-ADD COLUMN IF NOT EXISTS default_fish_a_restaurant_budget DECIMAL(12, 2) NOT NULL DEFAULT 50000.00;
+ADD COLUMN default_fish_a_restaurant_budget DECIMAL(12, 2) NOT NULL DEFAULT 50000.00;
 
--- ========================================
--- 4. 新增 B級魚餐廳預設每日資金池
--- ========================================
 ALTER TABLE games
-ADD COLUMN IF NOT EXISTS default_fish_b_restaurant_budget DECIMAL(12, 2) NOT NULL DEFAULT 50000.00;
-
--- ========================================
--- 完成
--- ========================================
-SELECT '✅ 預設供給量和餐廳資金池欄位新增完成！' AS message;
+ADD COLUMN default_fish_b_restaurant_budget DECIMAL(12, 2) NOT NULL DEFAULT 50000.00
