@@ -31,6 +31,11 @@ export default function CreateGamePage() {
     distributorFloorPriceB: 0,
     targetPriceA: 0,
     targetPriceB: 0,
+    // 新增：預設每日供給量和餐廳資金池
+    defaultFishASupply: 100,
+    defaultFishBSupply: 100,
+    defaultFishARestaurantBudget: 50000,
+    defaultFishBRestaurantBudget: 50000,
     buyingDuration: 300,
     sellingDuration: 300,
   }
@@ -218,6 +223,70 @@ export default function CreateGamePage() {
               rules={[{ required: true }]}
             >
               <InputNumber min={0} step={10} style={{ width: 150 }} addonBefore="$" />
+            </Form.Item>
+          </Space>
+        </Card>
+
+        <Card title="每日預設參數" style={{ marginBottom: 24 }}>
+          <Title level={5}>預設供給量</Title>
+          <Paragraph type="secondary" style={{ fontSize: 13 }}>
+            每日買入階段開始時的預設魚貨供給量（可在開始階段時調整）
+          </Paragraph>
+
+          <Space size="large">
+            <Form.Item
+              label="A級魚預設供給"
+              name="defaultFishASupply"
+              rules={[{ required: true, message: '請輸入A級魚供給量' }]}
+            >
+              <InputNumber min={0} max={10000} step={10} style={{ width: 150 }} addonAfter="公斤" />
+            </Form.Item>
+
+            <Form.Item
+              label="B級魚預設供給"
+              name="defaultFishBSupply"
+              rules={[{ required: true, message: '請輸入B級魚供給量' }]}
+            >
+              <InputNumber min={0} max={10000} step={10} style={{ width: 150 }} addonAfter="公斤" />
+            </Form.Item>
+          </Space>
+
+          <Divider />
+
+          <Title level={5}>預設餐廳資金池</Title>
+          <Paragraph type="secondary" style={{ fontSize: 13 }}>
+            每日賣出階段開始時的預設餐廳收購資金（可在開始階段時調整）
+          </Paragraph>
+
+          <Space size="large">
+            <Form.Item
+              label="A級魚餐廳資金"
+              name="defaultFishARestaurantBudget"
+              rules={[{ required: true, message: '請輸入A級魚餐廳資金' }]}
+            >
+              <InputNumber
+                min={0}
+                step={10000}
+                style={{ width: 180 }}
+                addonBefore="$"
+                formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                parser={(value) => Number(value!.replace(/\$\s?|(,*)/g, '')) as unknown as 0}
+              />
+            </Form.Item>
+
+            <Form.Item
+              label="B級魚餐廳資金"
+              name="defaultFishBRestaurantBudget"
+              rules={[{ required: true, message: '請輸入B級魚餐廳資金' }]}
+            >
+              <InputNumber
+                min={0}
+                step={10000}
+                style={{ width: 180 }}
+                addonBefore="$"
+                formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                parser={(value) => Number(value!.replace(/\$\s?|(,*)/g, '')) as unknown as 0}
+              />
             </Form.Item>
           </Space>
         </Card>

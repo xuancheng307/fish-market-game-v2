@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Card, Button, Tag, Space, Statistic, Row, Col, message, Modal, Descriptions, Alert, Table } from 'antd'
+import { Card, Button, Tag, Space, Statistic, Row, Col, message, Modal, Descriptions, Alert, Table, Form, InputNumber } from 'antd'
 import {
   PlayCircleOutlined,
   PauseCircleOutlined,
@@ -31,6 +31,12 @@ export default function GameControlPage() {
   const [settlementModalVisible, setSettlementModalVisible] = useState(false)
   const [settlementResults, setSettlementResults] = useState<DailyResult[]>([])
   const [settlementDay, setSettlementDay] = useState<number>(0)
+
+  // 供給量/資金池輸入 Modal 狀態
+  const [supplyModalVisible, setSupplyModalVisible] = useState(false)
+  const [budgetModalVisible, setBudgetModalVisible] = useState(false)
+  const [supplyForm] = Form.useForm()
+  const [budgetForm] = Form.useForm()
 
   // 載入遊戲資料
   const loadGameData = async () => {
@@ -132,36 +138,92 @@ export default function GameControlPage() {
   const handlePhaseAction = async (action: string) => {
     if (!game) return
 
+    // 如果是開始買入/賣出，先顯示 Modal
+    if (action === 'startBuying') {
+      // 設定預設值從遊戲參數
+      supplyForm.setFieldsValue({
+        fishASupply: game.defaultFishASupply || 100,
+        fishBSupply: game.defaultFishBSupply || 100,
+      })
+      setSupplyModalVisible(true)
+      return
+    }
+
+    if (action === 'startSelling') {
+      // 設定預設值從遊戲參數
+      budgetForm.setFieldsValue({
+        fishARestaurantBudget: game.defaultFishARestaurantBudget || 50000,
+        fishBRestaurantBudget: game.defaultFishBRestaurantBudget || 50000,
+      })
+      setBudgetModalVisible(true)
+      return
+    }
+
     setActionLoading(true)
     try {
-      let response
       switch (action) {
-        case 'startBuying':
-          response = await api.startBuying(game.id)
-          message.success('已開始買入投標階段')
-          break
         case 'closeBuying':
-          response = await api.closeBuying(game.id)
+          await api.closeBuying(game.id)
           message.success('已關閉買入投標')
           break
-        case 'startSelling':
-          response = await api.startSelling(game.id)
-          message.success('已開始賣出投標階段')
-          break
         case 'closeSelling':
-          response = await api.closeSelling(game.id)
+          await api.closeSelling(game.id)
           message.success('已關閉賣出投標')
           break
         case 'settle':
-          response = await api.settleDay(game.id)
+          await api.settleDay(game.id)
           message.success('當日結算完成')
           break
         case 'nextDay':
-          response = await api.nextDay(game.id)
+          await api.nextDay(game.id)
           message.success('已進入下一天')
           break
       }
 
+      await loadGameData()
+    } catch (error: any) {
+      message.error(getErrorMessage(error, '操作失敗'))
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  // 確認開始買入投標
+  const handleConfirmStartBuying = async () => {
+    if (!game) return
+
+    try {
+      const values = await supplyForm.validateFields()
+      setActionLoading(true)
+      setSupplyModalVisible(false)
+
+      await api.startBuying(game.id, {
+        fishASupply: values.fishASupply,
+        fishBSupply: values.fishBSupply,
+      })
+      message.success('已開始買入投標階段')
+      await loadGameData()
+    } catch (error: any) {
+      message.error(getErrorMessage(error, '操作失敗'))
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  // 確認開始賣出投標
+  const handleConfirmStartSelling = async () => {
+    if (!game) return
+
+    try {
+      const values = await budgetForm.validateFields()
+      setActionLoading(true)
+      setBudgetModalVisible(false)
+
+      await api.startSelling(game.id, {
+        fishARestaurantBudget: values.fishARestaurantBudget,
+        fishBRestaurantBudget: values.fishBRestaurantBudget,
+      })
+      message.success('已開始賣出投標階段')
       await loadGameData()
     } catch (error: any) {
       message.error(getErrorMessage(error, '操作失敗'))
@@ -486,6 +548,102 @@ export default function GameControlPage() {
           </Card>
         </Col>
       </Row>
+
+      {/* 買入階段供給量設定 Modal */}
+      <Modal
+        title="設定今日魚貨供給量"
+        open={supplyModalVisible}
+        onCancel={() => setSupplyModalVisible(false)}
+        onOk={handleConfirmStartBuying}
+        confirmLoading={actionLoading}
+        okText="開始買入投標"
+        cancelText="取消"
+      >
+        <Alert
+          message="請設定今日的魚貨供給量"
+          description="團隊將根據此供給量進行買入投標競價"
+          type="info"
+          showIcon
+          style={{ marginBottom: 16 }}
+        />
+        <Form form={supplyForm} layout="vertical">
+          <Form.Item
+            label="A級魚供給量"
+            name="fishASupply"
+            rules={[{ required: true, message: '請輸入A級魚供給量' }]}
+          >
+            <InputNumber
+              min={0}
+              max={10000}
+              step={10}
+              style={{ width: '100%' }}
+              addonAfter="公斤"
+            />
+          </Form.Item>
+          <Form.Item
+            label="B級魚供給量"
+            name="fishBSupply"
+            rules={[{ required: true, message: '請輸入B級魚供給量' }]}
+          >
+            <InputNumber
+              min={0}
+              max={10000}
+              step={10}
+              style={{ width: '100%' }}
+              addonAfter="公斤"
+            />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      {/* 賣出階段餐廳資金池設定 Modal */}
+      <Modal
+        title="設定餐廳收購資金池"
+        open={budgetModalVisible}
+        onCancel={() => setBudgetModalVisible(false)}
+        onOk={handleConfirmStartSelling}
+        confirmLoading={actionLoading}
+        okText="開始賣出投標"
+        cancelText="取消"
+      >
+        <Alert
+          message="請設定今日的餐廳收購資金池"
+          description="餐廳將使用此資金從低價開始收購團隊的魚貨"
+          type="info"
+          showIcon
+          style={{ marginBottom: 16 }}
+        />
+        <Form form={budgetForm} layout="vertical">
+          <Form.Item
+            label="A級魚餐廳資金"
+            name="fishARestaurantBudget"
+            rules={[{ required: true, message: '請輸入A級魚餐廳資金' }]}
+          >
+            <InputNumber
+              min={0}
+              step={10000}
+              style={{ width: '100%' }}
+              addonBefore="$"
+              formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+              parser={(value) => Number(value!.replace(/\$\s?|(,*)/g, '')) as unknown as 0}
+            />
+          </Form.Item>
+          <Form.Item
+            label="B級魚餐廳資金"
+            name="fishBRestaurantBudget"
+            rules={[{ required: true, message: '請輸入B級魚餐廳資金' }]}
+          >
+            <InputNumber
+              min={0}
+              step={10000}
+              style={{ width: '100%' }}
+              addonBefore="$"
+              formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+              parser={(value) => Number(value!.replace(/\$\s?|(,*)/g, '')) as unknown as 0}
+            />
+          </Form.Item>
+        </Form>
+      </Modal>
 
       {/* 結算結果彈窗 */}
       <Modal

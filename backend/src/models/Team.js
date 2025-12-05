@@ -35,7 +35,7 @@ class Team {
      */
     static async findByGame(gameId) {
         return await query(
-            'SELECT * FROM game_participants WHERE game_id = ? ORDER BY created_at ASC',
+            'SELECT * FROM game_participants WHERE game_id = ? ORDER BY team_number ASC',
             [gameId]
         );
     }

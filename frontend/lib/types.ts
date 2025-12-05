@@ -30,6 +30,11 @@ export interface Game {
   distributorFloorPriceB: number
   targetPriceA: number
   targetPriceB: number
+  // 新增：預設每日供給量和餐廳資金池
+  defaultFishASupply: number
+  defaultFishBSupply: number
+  defaultFishARestaurantBudget: number
+  defaultFishBRestaurantBudget: number
   buyingDuration: number
   sellingDuration: number
   isForceEnded: boolean
@@ -161,6 +166,11 @@ export interface GameCreateParams {
   distributorFloorPriceB: number
   targetPriceA: number
   targetPriceB: number
+  // 新增：預設每日供給量和餐廳資金池
+  defaultFishASupply: number
+  defaultFishBSupply: number
+  defaultFishARestaurantBudget: number
+  defaultFishBRestaurantBudget: number
   buyingDuration: number
   sellingDuration: number
 }

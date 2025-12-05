@@ -168,16 +168,16 @@ class ApiClient {
     }
   }
 
-  async startBuying(gameId: number): Promise<ApiResponse> {
-    return this.client.post(`/admin/games/${gameId}/start-buying`)
+  async startBuying(gameId: number, supplyData?: { fishASupply: number; fishBSupply: number }): Promise<ApiResponse> {
+    return this.client.post(`/admin/games/${gameId}/start-buying`, supplyData || {})
   }
 
   async closeBuying(gameId: number): Promise<ApiResponse> {
     return this.client.post(`/admin/games/${gameId}/close-buying`)
   }
 
-  async startSelling(gameId: number): Promise<ApiResponse> {
-    return this.client.post(`/admin/games/${gameId}/start-selling`)
+  async startSelling(gameId: number, budgetData?: { fishARestaurantBudget: number; fishBRestaurantBudget: number }): Promise<ApiResponse> {
+    return this.client.post(`/admin/games/${gameId}/start-selling`, budgetData || {})
   }
 
   async closeSelling(gameId: number): Promise<ApiResponse> {

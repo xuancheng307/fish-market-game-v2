@@ -61,6 +61,11 @@ class Game {
             distributor_floor_price_b = DEFAULT_GAME_PARAMS.DISTRIBUTOR_FLOOR_PRICE_B,
             target_price_a = DEFAULT_GAME_PARAMS.TARGET_PRICE_A,
             target_price_b = DEFAULT_GAME_PARAMS.TARGET_PRICE_B,
+            // 新增：預設每日供給量和餐廳資金池
+            default_fish_a_supply = 100,
+            default_fish_b_supply = 100,
+            default_fish_a_restaurant_budget = 50000,
+            default_fish_b_restaurant_budget = 50000,
             buying_duration = DEFAULT_GAME_PARAMS.BUYING_DURATION,
             selling_duration = DEFAULT_GAME_PARAMS.SELLING_DURATION,
             team_names = null
@@ -73,14 +78,18 @@ class Game {
                 unsold_fee_per_kg, fixed_unsold_ratio,
                 distributor_floor_price_a, distributor_floor_price_b,
                 target_price_a, target_price_b,
+                default_fish_a_supply, default_fish_b_supply,
+                default_fish_a_restaurant_budget, default_fish_b_restaurant_budget,
                 buying_duration, selling_duration, team_names
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
                 name, description, GAME_STATUS.ACTIVE, total_days, 1, num_teams,
                 initial_budget, daily_interest_rate, loan_interest_rate, max_loan_ratio,
                 unsold_fee_per_kg, fixed_unsold_ratio,
                 distributor_floor_price_a, distributor_floor_price_b,
                 target_price_a, target_price_b,
+                default_fish_a_supply, default_fish_b_supply,
+                default_fish_a_restaurant_budget, default_fish_b_restaurant_budget,
                 buying_duration, selling_duration,
                 team_names ? JSON.stringify(team_names) : null
             ]

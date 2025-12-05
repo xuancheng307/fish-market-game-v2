@@ -4,9 +4,9 @@
  * ⚠️ 核心商業邏輯：
  * 1. 現金扣除發生在結算時 (不是投標時!)
  * 2. 只扣除成交數量的金額
- * 3. 未成交部分不退款
- * 4. 優先順序: 價格優先，相同價格早提交優先
- * 5. 固定滯銷 2.5%
+ * 3. 買入：高價優先成交，無滯銷
+ * 4. 賣出：先扣最高價2.5%滯銷，再從低價開始用餐廳資金購買
+ * 5. 當日結束所有庫存清零
  */
 
 const Bid = require('../models/Bid');
@@ -21,7 +21,7 @@ const { ERROR_CODES, FISH_TYPE } = require('../config/constants');
 class SettlementService {
     /**
      * 買入結算 (批發商 → 團隊)
-     * ⚠️ 關鍵：現金扣除發生在這裡！
+     * ⚠️ 關鍵：高價優先成交，無滯銷
      */
     static async settleBuyingPhase(gameId, dayNumber) {
         const gameDay = await GameDay.findByGameAndDay(gameId, dayNumber);
@@ -41,28 +41,27 @@ class SettlementService {
 
     /**
      * 買入結算 - 單一魚種
+     * ⚠️ 高價優先成交，直到供給賣完，無滯銷
      */
     static async _settleBuyingForFishType(gameId, dayNumber, fishType, game, gameDay) {
-        // 1. 取得所有買入投標 (按價格降序、時間升序)
+        // 1. 取得所有買入投標 (按價格降序、時間升序 - 高價優先)
         const bids = await Bid.findByGameDay(gameId, dayNumber, {
             bid_type: 'buy',
             fish_type: fishType
         });
 
         if (bids.length === 0) {
-            return { totalFulfilled: 0, totalCost: 0 };
+            return { totalFulfilled: 0, totalCost: 0, remainingSupply: 0 };
         }
 
-        // 2. 計算固定滯銷 (2.5%)
+        // 2. 取得供給量（買入無滯銷！）
         const supply = fishType === FISH_TYPE.A ? gameDay.fish_a_supply : gameDay.fish_b_supply;
-        const fixedUnsoldRatio = parseFloat(game.fixed_unsold_ratio);
-        const unsoldQuantity = Math.floor(supply * fixedUnsoldRatio);
-        let remainingSupply = supply - unsoldQuantity;
+        let remainingSupply = supply;
 
         let totalFulfilled = 0;
         let totalCost = 0;
 
-        // 3. 分配魚貨給投標者
+        // 3. 按價格高到低分配魚貨（bids 已經按價格降序排列）
         for (const bid of bids) {
             const team = await Team.findById(bid.team_id);
             if (!team) continue;
@@ -97,14 +96,17 @@ class SettlementService {
         return {
             totalFulfilled,
             totalCost,
-            unsoldQuantity,
             remainingSupply
         };
     }
 
     /**
      * 賣出結算 (團隊 → 餐廳)
-     * ⚠️ 關鍵：現金增加、庫存減少、滯銷費用扣除
+     * ⚠️ 關鍵邏輯：
+     * 1. 先從最高價扣除 2.5% 作為滯銷
+     * 2. 從最低價開始用餐廳資金購買
+     * 3. 餐廳沒錢後剩餘的不成交
+     * 4. 當日結束所有庫存清零
      */
     static async settleSellingPhase(gameId, dayNumber) {
         const gameDay = await GameDay.findByGameAndDay(gameId, dayNumber);
@@ -124,65 +126,79 @@ class SettlementService {
 
     /**
      * 賣出結算 - 單一魚種
+     * ⚠️ 邏輯：
+     * 1. 先從最高價扣除 2.5% 滯銷（扣庫存、扣滯銷費）
+     * 2. 從最低價開始用餐廳資金購買（加現金、扣庫存）
+     * 3. 餐廳沒錢後剩餘不成交（不加錢、但庫存當天清零）
      */
     static async _settleSellingForFishType(gameId, dayNumber, fishType, game, gameDay) {
-        // 1. 取得所有賣出投標 (按價格升序、時間升序)
+        // 1. 取得所有賣出投標
         const bids = await Bid.findByGameDay(gameId, dayNumber, {
             bid_type: 'sell',
             fish_type: fishType
         });
 
         if (bids.length === 0) {
+            // 即使沒有賣出投標，也要清空所有庫存
+            await this._clearInventoryForFishType(gameId, fishType);
             return { totalSold: 0, totalRevenue: 0, totalUnsold: 0, totalUnsoldPenalty: 0 };
         }
 
-        // 2. 計算固定滯銷 (2.5%) - 最高價優先滯銷
+        // 2. 計算總投標量和滯銷量 (2.5%)
         const totalQuantity = bids.reduce((sum, b) => sum + b.quantity_submitted, 0);
         const fixedUnsoldRatio = parseFloat(game.fixed_unsold_ratio);
-        const unsoldQuantity = Math.floor(totalQuantity * fixedUnsoldRatio);
+        const totalUnsoldQuantity = Math.floor(totalQuantity * fixedUnsoldRatio);
 
-        // 找出最高價投標
+        // 3. 按價格降序排列，從最高價開始分配滯銷
         const sortedByPriceDesc = [...bids].sort((a, b) => {
-            if (parseFloat(b.price) === parseFloat(a.price)) {
-                return new Date(a.created_at) - new Date(b.created_at); // 早提交優先
-            }
-            return parseFloat(b.price) - parseFloat(a.price);
+            const priceDiff = parseFloat(b.price) - parseFloat(a.price);
+            if (priceDiff !== 0) return priceDiff;
+            return new Date(a.created_at) - new Date(b.created_at); // 同價早提交優先滯銷
         });
 
-        // 標記滯銷
+        // 標記每筆投標的滯銷數量
         const bidUnsoldMap = new Map();
-        let remainingUnsold = unsoldQuantity;
+        let remainingUnsold = totalUnsoldQuantity;
 
         for (const bid of sortedByPriceDesc) {
             if (remainingUnsold <= 0) break;
-
             const unsoldForThisBid = Math.min(bid.quantity_submitted, remainingUnsold);
             bidUnsoldMap.set(bid.id, unsoldForThisBid);
             remainingUnsold -= unsoldForThisBid;
         }
 
-        // 3. 處理滯銷費用
+        // 4. 處理滯銷（扣庫存、扣滯銷費）
         const unsoldFeePerKg = parseFloat(game.unsold_fee_per_kg);
         let totalUnsold = 0;
         let totalUnsoldPenalty = 0;
 
         for (const [bidId, unsoldQty] of bidUnsoldMap.entries()) {
+            if (unsoldQty <= 0) continue;
+
             const bid = bids.find(b => b.id === bidId);
             const team = await Team.findById(bid.team_id);
+            if (!team) continue;
 
             const unsoldPenalty = unsoldQty * unsoldFeePerKg;
+            const inventoryField = fishType === FISH_TYPE.A ? 'fish_a_inventory' : 'fish_b_inventory';
+            const currentInventory = fishType === FISH_TYPE.A ? team.fish_a_inventory : team.fish_b_inventory;
 
             await Team.update(team.id, {
                 cash: parseFloat(team.cash) - unsoldPenalty,
-                [fishType === FISH_TYPE.A ? 'fish_a_inventory' : 'fish_b_inventory']:
-                    (fishType === FISH_TYPE.A ? team.fish_a_inventory : team.fish_b_inventory) - unsoldQty
+                [inventoryField]: currentInventory - unsoldQty
             });
 
             totalUnsold += unsoldQty;
             totalUnsoldPenalty += unsoldPenalty;
         }
 
-        // 4. 分配給餐廳買家
+        // 5. 按價格升序排列，從最低價開始用餐廳資金購買
+        const sortedByPriceAsc = [...bids].sort((a, b) => {
+            const priceDiff = parseFloat(a.price) - parseFloat(b.price);
+            if (priceDiff !== 0) return priceDiff;
+            return new Date(a.created_at) - new Date(b.created_at); // 同價早提交優先
+        });
+
         const restaurantBudget = fishType === FISH_TYPE.A ?
             parseFloat(gameDay.fish_a_restaurant_budget) :
             parseFloat(gameDay.fish_b_restaurant_budget);
@@ -191,11 +207,11 @@ class SettlementService {
         let totalSold = 0;
         let totalRevenue = 0;
 
-        for (const bid of bids) {
+        for (const bid of sortedByPriceAsc) {
             const team = await Team.findById(bid.team_id);
             if (!team) continue;
 
-            // 扣除滯銷部分
+            // 計算可賣數量（扣除滯銷部分）
             const unsoldForThisBid = bidUnsoldMap.get(bid.id) || 0;
             const sellableQty = bid.quantity_submitted - unsoldForThisBid;
 
@@ -204,19 +220,19 @@ class SettlementService {
                 continue;
             }
 
-            // 計算可買數量 (受餐廳預算限制)
+            // 計算餐廳能買多少（受預算限制）
             const price = parseFloat(bid.price);
-            const maxAffordable = Math.floor(remainingBudget / price);
+            const maxAffordable = price > 0 ? Math.floor(remainingBudget / price) : 0;
             const fulfilledQty = Math.min(sellableQty, maxAffordable);
 
             if (fulfilledQty > 0) {
-                // 增加現金、減少庫存
                 const revenue = price * fulfilledQty;
+                const inventoryField = fishType === FISH_TYPE.A ? 'fish_a_inventory' : 'fish_b_inventory';
+                const currentInventory = fishType === FISH_TYPE.A ? team.fish_a_inventory : team.fish_b_inventory;
 
                 await Team.update(team.id, {
                     cash: parseFloat(team.cash) + revenue,
-                    [fishType === FISH_TYPE.A ? 'fish_a_inventory' : 'fish_b_inventory']:
-                        (fishType === FISH_TYPE.A ? team.fish_a_inventory : team.fish_b_inventory) - fulfilledQty
+                    [inventoryField]: currentInventory - fulfilledQty
                 });
 
                 await Bid.updateFulfillment(bid.id, fulfilledQty);
@@ -225,27 +241,35 @@ class SettlementService {
                 totalSold += fulfilledQty;
                 totalRevenue += revenue;
             } else {
+                // 餐廳沒錢了，標記為未成交
                 await Bid.updateFulfillment(bid.id, 0);
             }
-
-            if (remainingBudget <= 0) break;
         }
 
-        // 5. ⚠️ 關鍵遊戲規則：當日結束，所有剩餘庫存歸零！
-        // 不論有沒有賣出，當天所有庫存都要清空
-        const allTeams = await Team.findByGame(gameId);
-        for (const clearTeam of allTeams) {
-            await Team.update(clearTeam.id, {
-                [fishType === FISH_TYPE.A ? 'fish_a_inventory' : 'fish_b_inventory']: 0
-            });
-        }
+        // 6. ⚠️ 關鍵：當日結束，所有剩餘庫存歸零！
+        await this._clearInventoryForFishType(gameId, fishType);
 
         return {
             totalSold,
             totalRevenue,
             totalUnsold,
-            totalUnsoldPenalty
+            totalUnsoldPenalty,
+            remainingBudget
         };
+    }
+
+    /**
+     * 清空指定魚種的所有團隊庫存
+     */
+    static async _clearInventoryForFishType(gameId, fishType) {
+        const allTeams = await Team.findByGame(gameId);
+        const inventoryField = fishType === FISH_TYPE.A ? 'fish_a_inventory' : 'fish_b_inventory';
+
+        for (const team of allTeams) {
+            await Team.update(team.id, {
+                [inventoryField]: 0
+            });
+        }
     }
 
     /**

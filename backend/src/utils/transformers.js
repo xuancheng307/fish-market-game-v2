@@ -95,6 +95,12 @@ function gameToApi(dbRow) {
         targetPriceA: parseFloat(dbRow.target_price_a),
         targetPriceB: parseFloat(dbRow.target_price_b),
 
+        // 新增：預設每日供給量和餐廳資金池
+        defaultFishASupply: dbRow.default_fish_a_supply || 100,
+        defaultFishBSupply: dbRow.default_fish_b_supply || 100,
+        defaultFishARestaurantBudget: parseFloat(dbRow.default_fish_a_restaurant_budget) || 50000,
+        defaultFishBRestaurantBudget: parseFloat(dbRow.default_fish_b_restaurant_budget) || 50000,
+
         buyingDuration: dbRow.buying_duration,
         sellingDuration: dbRow.selling_duration,
 
@@ -284,6 +290,12 @@ function apiToGame(apiData) {
         distributor_floor_price_b: apiData.distributorFloorPriceB,
         target_price_a: apiData.targetPriceA,
         target_price_b: apiData.targetPriceB,
+
+        // 新增：預設每日供給量和餐廳資金池
+        default_fish_a_supply: apiData.defaultFishASupply,
+        default_fish_b_supply: apiData.defaultFishBSupply,
+        default_fish_a_restaurant_budget: apiData.defaultFishARestaurantBudget,
+        default_fish_b_restaurant_budget: apiData.defaultFishBRestaurantBudget,
 
         buying_duration: apiData.buyingDuration,
         selling_duration: apiData.sellingDuration,

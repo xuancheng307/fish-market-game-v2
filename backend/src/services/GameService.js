@@ -24,32 +24,59 @@ class GameService {
             description,
             total_days,
             num_teams,
-            team_names,
             initial_budget,
             loan_interest_rate,
             max_loan_ratio,
             unsold_fee_per_kg,
             fixed_unsold_ratio,
             buying_duration,
-            selling_duration
+            selling_duration,
+            distributor_floor_price_a,
+            distributor_floor_price_b,
+            target_price_a,
+            target_price_b,
+            // 新增：預設每日供給量和餐廳資金池
+            default_fish_a_supply,
+            default_fish_b_supply,
+            default_fish_a_restaurant_budget,
+            default_fish_b_restaurant_budget
         } = gameData;
 
+        // 如果沒有提供 team_names，根據 num_teams 自動生成
+        let team_names = gameData.team_names;
+        if (!team_names && num_teams) {
+            team_names = [];
+            for (let i = 1; i <= num_teams; i++) {
+                team_names.push(`第 ${String(i).padStart(2, '0')} 組`);
+            }
+        }
+
         return await transaction(async (conn) => {
-            // 1. 創建遊戲
-            const game = await Game.create({
-                name,
-                description,
-                total_days,
-                num_teams,
-                initial_budget,
-                loan_interest_rate,
-                max_loan_ratio,
-                unsold_fee_per_kg,
-                fixed_unsold_ratio,
-                buying_duration,
-                selling_duration,
-                team_names
-            });
+            // 1. 創建遊戲（只傳入有值的欄位，讓 Model 使用預設值處理 undefined）
+            const createData = {};
+            if (name !== undefined) createData.name = name;
+            if (description !== undefined) createData.description = description;
+            if (total_days !== undefined) createData.total_days = total_days;
+            if (num_teams !== undefined) createData.num_teams = num_teams;
+            if (initial_budget !== undefined) createData.initial_budget = initial_budget;
+            if (loan_interest_rate !== undefined) createData.loan_interest_rate = loan_interest_rate;
+            if (max_loan_ratio !== undefined) createData.max_loan_ratio = max_loan_ratio;
+            if (unsold_fee_per_kg !== undefined) createData.unsold_fee_per_kg = unsold_fee_per_kg;
+            if (fixed_unsold_ratio !== undefined) createData.fixed_unsold_ratio = fixed_unsold_ratio;
+            if (buying_duration !== undefined) createData.buying_duration = buying_duration;
+            if (selling_duration !== undefined) createData.selling_duration = selling_duration;
+            if (distributor_floor_price_a !== undefined) createData.distributor_floor_price_a = distributor_floor_price_a;
+            if (distributor_floor_price_b !== undefined) createData.distributor_floor_price_b = distributor_floor_price_b;
+            if (target_price_a !== undefined) createData.target_price_a = target_price_a;
+            if (target_price_b !== undefined) createData.target_price_b = target_price_b;
+            // 新增：預設每日供給量和餐廳資金池
+            if (default_fish_a_supply !== undefined) createData.default_fish_a_supply = default_fish_a_supply;
+            if (default_fish_b_supply !== undefined) createData.default_fish_b_supply = default_fish_b_supply;
+            if (default_fish_a_restaurant_budget !== undefined) createData.default_fish_a_restaurant_budget = default_fish_a_restaurant_budget;
+            if (default_fish_b_restaurant_budget !== undefined) createData.default_fish_b_restaurant_budget = default_fish_b_restaurant_budget;
+            if (team_names !== undefined) createData.team_names = team_names;
+
+            const game = await Game.create(createData);
 
             // 2. 創建第一天（status = pending）
             await GameDay.create({
@@ -79,16 +106,20 @@ class GameService {
                             role: 'team',
                             display_name: teamName
                         });
+                    } else {
+                        // 如果用戶已存在，更新 display_name 以確保對應正確
+                        await User.update(user.id, { display_name: teamName });
                     }
 
                     // 創建團隊參與記錄（包含 team_number）
+                    // 使用遊戲的初始預算（從剛創建的遊戲記錄中取得）
                     await Team.create({
                         game_id: game.id,
                         user_id: user.id,
                         team_name: teamName,
                         team_number: teamNumber,
-                        cash: initial_budget,
-                        initial_budget: initial_budget
+                        cash: game.initial_budget,
+                        initial_budget: game.initial_budget
                     });
                 }
             }

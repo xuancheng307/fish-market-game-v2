@@ -16,7 +16,7 @@ import {
 import { api } from '@/lib/api'
 import { wsClient } from '@/lib/websocket'
 import { getErrorMessage } from '@/lib/utils'
-import { DAY_STATUS, BID_TYPE, FISH_TYPE } from '@/lib/constants'
+import { DAY_STATUS, BID_TYPE } from '@/lib/constants'
 import type { Game, GameDay, Bid, Team, DailyResult } from '@/lib/types'
 
 export default function TeamHomePage() {
@@ -105,24 +105,61 @@ export default function TeamHomePage() {
     }
   }, [])
 
-  // 提交投標
+  // 提交投標（8欄位一次提交，拆分成最多4筆投標）
   const handleSubmitBid = async (values: any) => {
     if (!game || !gameDay) return
 
     try {
       setSubmitting(true)
 
-      const bidData = {
-        gameId: game.id,
-        dayNumber: game.currentDay,
-        bidType: values.bidType,
-        fishType: values.fishType,
-        price: values.price,
-        quantity: values.quantity,
+      const bidType = canBuy ? BID_TYPE.BUY : BID_TYPE.SELL
+      const bids: Array<{ fishType: 'A' | 'B'; price: number; quantity: number }> = []
+
+      // 收集所有有效的投標（價格和數量都有值的）
+      if (values.fishAPrice1 && values.fishAQty1) {
+        bids.push({ fishType: 'A', price: values.fishAPrice1, quantity: values.fishAQty1 })
+      }
+      if (values.fishAPrice2 && values.fishAQty2) {
+        bids.push({ fishType: 'A', price: values.fishAPrice2, quantity: values.fishAQty2 })
+      }
+      if (values.fishBPrice1 && values.fishBQty1) {
+        bids.push({ fishType: 'B', price: values.fishBPrice1, quantity: values.fishBQty1 })
+      }
+      if (values.fishBPrice2 && values.fishBQty2) {
+        bids.push({ fishType: 'B', price: values.fishBPrice2, quantity: values.fishBQty2 })
       }
 
-      await api.submitBid(bidData)
-      message.success('投標提交成功！')
+      if (bids.length === 0) {
+        message.warning('請至少填寫一組投標（價格和數量都需填寫）')
+        return
+      }
+
+      // 依序提交所有投標
+      let successCount = 0
+      let errorMessages: string[] = []
+
+      for (const bid of bids) {
+        try {
+          await api.submitBid({
+            gameId: game.id,
+            bidType,
+            fishType: bid.fishType,
+            price: bid.price,
+            quantity: bid.quantity,
+          })
+          successCount++
+        } catch (error: any) {
+          errorMessages.push(`${bid.fishType}魚 $${bid.price}: ${getErrorMessage(error, '提交失敗')}`)
+        }
+      }
+
+      if (successCount > 0) {
+        message.success(`成功提交 ${successCount} 筆投標！`)
+      }
+      if (errorMessages.length > 0) {
+        message.error(`部分投標失敗：${errorMessages.join('、')}`)
+      }
+
       form.resetFields()
       await loadData()
     } catch (error: any) {
@@ -328,7 +365,7 @@ export default function TeamHomePage() {
           </Card>
         )}
 
-        {/* 投標表單 */}
+        {/* 投標表單 - 8欄位同時提交 */}
         {canBid && game && (
           <Card
             title={
@@ -342,76 +379,102 @@ export default function TeamHomePage() {
               form={form}
               layout="vertical"
               onFinish={handleSubmitBid}
-              initialValues={{
-                bidType: canBuy ? BID_TYPE.BUY : BID_TYPE.SELL,
-              }}
             >
-              <Row gutter={16}>
-                <Col xs={24} md={8}>
-                  <Form.Item
-                    label="魚種"
-                    name="fishType"
-                    rules={[{ required: true, message: '請選擇魚種' }]}
-                  >
-                    <Button.Group style={{ width: '100%' }}>
-                      <Button
-                        style={{ width: '50%' }}
-                        type={form.getFieldValue('fishType') === FISH_TYPE.A ? 'primary' : 'default'}
-                        onClick={() => form.setFieldsValue({ fishType: FISH_TYPE.A })}
-                      >
-                        A級魚
-                      </Button>
-                      <Button
-                        style={{ width: '50%' }}
-                        type={form.getFieldValue('fishType') === FISH_TYPE.B ? 'primary' : 'default'}
-                        onClick={() => form.setFieldsValue({ fishType: FISH_TYPE.B })}
-                      >
-                        B級魚
-                      </Button>
-                    </Button.Group>
-                  </Form.Item>
-                </Col>
+              {/* A級魚區塊 */}
+              <Card
+                size="small"
+                title={<Tag color="purple" style={{ fontSize: 14 }}>A級魚</Tag>}
+                style={{ marginBottom: 16, background: '#f5f0ff' }}
+              >
+                <Row gutter={16}>
+                  <Col xs={12} sm={6}>
+                    <Form.Item label="投標1 - 價格" name="fishAPrice1">
+                      <InputNumber
+                        style={{ width: '100%' }}
+                        placeholder="$/kg"
+                        min={0}
+                        prefix="$"
+                      />
+                    </Form.Item>
+                  </Col>
+                  <Col xs={12} sm={6}>
+                    <Form.Item label="投標1 - 數量" name="fishAQty1">
+                      <InputNumber
+                        style={{ width: '100%' }}
+                        placeholder="kg"
+                        min={1}
+                      />
+                    </Form.Item>
+                  </Col>
+                  <Col xs={12} sm={6}>
+                    <Form.Item label="投標2 - 價格" name="fishAPrice2">
+                      <InputNumber
+                        style={{ width: '100%' }}
+                        placeholder="$/kg"
+                        min={0}
+                        prefix="$"
+                      />
+                    </Form.Item>
+                  </Col>
+                  <Col xs={12} sm={6}>
+                    <Form.Item label="投標2 - 數量" name="fishAQty2">
+                      <InputNumber
+                        style={{ width: '100%' }}
+                        placeholder="kg"
+                        min={1}
+                      />
+                    </Form.Item>
+                  </Col>
+                </Row>
+              </Card>
 
-                <Col xs={24} md={8}>
-                  <Form.Item
-                    label="價格 ($/kg)"
-                    name="price"
-                    rules={[
-                      { required: true, message: '請輸入價格' },
-                      { type: 'number', min: 0, message: '價格不能為負' },
-                    ]}
-                  >
-                    <InputNumber
-                      style={{ width: '100%' }}
-                      placeholder="輸入價格"
-                      min={0}
-                      prefix="$"
-                    />
-                  </Form.Item>
-                </Col>
-
-                <Col xs={24} md={8}>
-                  <Form.Item
-                    label="數量 (kg)"
-                    name="quantity"
-                    rules={[
-                      { required: true, message: '請輸入數量' },
-                      { type: 'number', min: 1, message: '數量至少為 1' },
-                    ]}
-                  >
-                    <InputNumber
-                      style={{ width: '100%' }}
-                      placeholder="輸入數量"
-                      min={1}
-                      suffix="kg"
-                    />
-                  </Form.Item>
-                </Col>
-              </Row>
-
-              <Form.Item name="bidType" hidden>
-                <input />
-              </Form.Item>
+              {/* B級魚區塊 */}
+              <Card
+                size="small"
+                title={<Tag color="orange" style={{ fontSize: 14 }}>B級魚</Tag>}
+                style={{ marginBottom: 16, background: '#fff7e6' }}
+              >
+                <Row gutter={16}>
+                  <Col xs={12} sm={6}>
+                    <Form.Item label="投標1 - 價格" name="fishBPrice1">
+                      <InputNumber
+                        style={{ width: '100%' }}
+                        placeholder="$/kg"
+                        min={0}
+                        prefix="$"
+                      />
+                    </Form.Item>
+                  </Col>
+                  <Col xs={12} sm={6}>
+                    <Form.Item label="投標1 - 數量" name="fishBQty1">
+                      <InputNumber
+                        style={{ width: '100%' }}
+                        placeholder="kg"
+                        min={1}
+                      />
+                    </Form.Item>
+                  </Col>
+                  <Col xs={12} sm={6}>
+                    <Form.Item label="投標2 - 價格" name="fishBPrice2">
+                      <InputNumber
+                        style={{ width: '100%' }}
+                        placeholder="$/kg"
+                        min={0}
+                        prefix="$"
+                      />
+                    </Form.Item>
+                  </Col>
+                  <Col xs={12} sm={6}>
+                    <Form.Item label="投標2 - 數量" name="fishBQty2">
+                      <InputNumber
+                        style={{ width: '100%' }}
+                        placeholder="kg"
+                        min={1}
+                      />
+                    </Form.Item>
+                  </Col>
+                </Row>
+              </Card>
 
               <Form.Item>
                 <Button
@@ -422,27 +485,28 @@ export default function TeamHomePage() {
                   loading={submitting}
                   block
                 >
-                  提交投標
+                  提交所有投標
                 </Button>
               </Form.Item>
 
-              {canBuy && (
-                <Alert
-                  message="提示"
-                  description="買入投標時，如果現金不足會自動進行借貸。請注意借貸會產生利息！"
-                  type="info"
-                  showIcon
-                />
-              )}
-
-              {canSell && myTeam && (
-                <Alert
-                  message="庫存提示"
-                  description={`當前庫存：A級魚 ${myTeam.fishAInventory} kg，B級魚 ${myTeam.fishBInventory} kg。請確保投標數量不超過現有庫存！`}
-                  type={myTeam.fishAInventory === 0 && myTeam.fishBInventory === 0 ? 'warning' : 'info'}
-                  showIcon
-                />
-              )}
+              <Alert
+                message="投標說明"
+                description={
+                  <ul style={{ margin: 0, paddingLeft: 16 }}>
+                    <li>每種魚可以同時提交兩個不同價格的投標</li>
+                    <li>只需填寫您要投標的欄位，留空的欄位將被忽略</li>
+                    <li>價格和數量必須成對填寫才有效</li>
+                    {canBuy && <li style={{ color: '#faad14' }}>買入投標時，現金不足會自動借貸（有利息）</li>}
+                    {canSell && myTeam && (
+                      <li style={{ color: '#1890ff' }}>
+                        當前庫存：A級魚 {myTeam.fishAInventory} kg，B級魚 {myTeam.fishBInventory} kg
+                      </li>
+                    )}
+                  </ul>
+                }
+                type="info"
+                showIcon
+              />
             </Form>
           </Card>
         )}
