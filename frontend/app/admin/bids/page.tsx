@@ -1,21 +1,38 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { Card, Table, Select, Space, Tag, message, Statistic, Row, Col } from 'antd'
-import { CheckCircleOutlined, CloseCircleOutlined, MinusCircleOutlined } from '@ant-design/icons'
+import { useState, useEffect, useMemo } from 'react'
+import { Card, Table, Select, Radio, Space, Typography, message, Row, Col, Statistic, Empty } from 'antd'
 import { api } from '@/lib/api'
 import { wsClient } from '@/lib/websocket'
-import type { Game, Bid } from '@/lib/types'
+import type { Game, GameDay, Bid } from '@/lib/types'
 
+const { Title, Text } = Typography
 const { Option } = Select
+
+// 團隊投標摘要介面
+interface TeamBidSummary {
+  teamNumber: number
+  teamName: string
+  bids: { price: number; quantity: number; fulfilled: number }[]  // 每筆投標獨立記錄成交量
+  totalFulfilled: number  // 總成交量（用於統計）
+  latestTime: string
+}
+
+// 價格統計介面
+interface PriceStats {
+  highestPrice: number | null
+  lowestPrice: number | null
+  totalVolume: number
+  totalAmount: number
+}
 
 export default function BidsPage() {
   const [game, setGame] = useState<Game | null>(null)
+  const [currentDay, setCurrentDay] = useState<GameDay | null>(null)
   const [bids, setBids] = useState<Bid[]>([])
   const [loading, setLoading] = useState(true)
-  const [selectedDay, setSelectedDay] = useState<number | null>(null)
-  const [selectedFishType, setSelectedFishType] = useState<string>('all')
-  const [selectedBidType, setSelectedBidType] = useState<string>('all')
+  const [selectedDay, setSelectedDay] = useState<number>(1)
+  const [selectedBidType, setSelectedBidType] = useState<'buy' | 'sell'>('buy')
 
   // 載入遊戲資料
   const loadGameData = async () => {
@@ -24,11 +41,32 @@ export default function BidsPage() {
       const gameResponse = await api.getActiveGame()
 
       if (gameResponse.data) {
-        setGame(gameResponse.data)
-        setSelectedDay(gameResponse.data.currentDay)
+        const gameData = gameResponse.data
+        setGame(gameData)
+        setSelectedDay(gameData.currentDay)
+
+        // 獲取當前 game day 的狀態
+        try {
+          const dayResponse = await api.getCurrentGameDay(gameData.id)
+          if (dayResponse.data) {
+            setCurrentDay(dayResponse.data)
+            // 根據當前狀態設定預設的投標類型
+            // buying_open, buying_closed → 買入
+            // selling_open, selling_closed, settled → 賣出
+            const dayStatus = dayResponse.data.status
+            if (['selling_open', 'selling_closed', 'settled'].includes(dayStatus)) {
+              setSelectedBidType('sell')
+            } else {
+              setSelectedBidType('buy')
+            }
+          }
+        } catch (e) {
+          // 如果獲取失敗，預設使用買入
+          setSelectedBidType('buy')
+        }
 
         // 載入投標記錄
-        await loadBids(gameResponse.data.id, gameResponse.data.currentDay)
+        await loadBids(gameData.id, gameData.currentDay)
       }
     } catch (error: any) {
       if (error?.error?.includes('沒有進行中的遊戲')) {
@@ -88,158 +126,217 @@ export default function BidsPage() {
 
   // 當選擇的天數改變時重新載入
   useEffect(() => {
-    if (game && selectedDay) {
+    if (game) {
       loadBids(game.id, selectedDay)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [game?.id, selectedDay])
 
-  // 過濾投標記錄
-  const filteredBids = bids.filter(bid => {
-    if (selectedFishType !== 'all' && bid.fishType !== selectedFishType) return false
-    if (selectedBidType !== 'all' && bid.bidType !== selectedBidType) return false
-    return true
-  })
+  // 根據選擇的投標類型過濾
+  const filteredBids = useMemo(() => {
+    return bids.filter(bid => bid.bidType === selectedBidType)
+  }, [bids, selectedBidType])
 
-  // 獲取投標狀態標籤
-  const getBidStatusTag = (bid: Bid) => {
-    switch (bid.status) {
-      case 'fulfilled':
-        return <Tag color="success" icon={<CheckCircleOutlined />}>完全成交</Tag>
-      case 'partial':
-        return <Tag color="warning" icon={<MinusCircleOutlined />}>部分成交</Tag>
-      case 'failed':
-        return <Tag color="error" icon={<CloseCircleOutlined />}>未成交</Tag>
-      default:
-        return <Tag color="default">待處理</Tag>
+  // 按魚種分組
+  const fishABids = useMemo(() => {
+    return filteredBids.filter(b => b.fishType === 'A')
+  }, [filteredBids])
+
+  const fishBBids = useMemo(() => {
+    return filteredBids.filter(b => b.fishType === 'B')
+  }, [filteredBids])
+
+  // 按團隊分組（每隊最多 2 筆同魚種投標）
+  const groupByTeam = (bidsData: Bid[]): TeamBidSummary[] => {
+    const map = new Map<number, TeamBidSummary>()
+
+    for (const bid of bidsData) {
+      if (!map.has(bid.teamId)) {
+        map.set(bid.teamId, {
+          teamNumber: bid.teamNumber,
+          teamName: bid.teamName,
+          bids: [],
+          totalFulfilled: 0,
+          latestTime: bid.createdAt
+        })
+      }
+
+      const team = map.get(bid.teamId)!
+      team.bids.push({
+        price: bid.price,
+        quantity: bid.quantitySubmitted,
+        fulfilled: bid.quantityFulfilled || 0
+      })
+      team.totalFulfilled += (bid.quantityFulfilled || 0)
+
+      if (new Date(bid.createdAt) > new Date(team.latestTime)) {
+        team.latestTime = bid.createdAt
+      }
+    }
+
+    return Array.from(map.values()).sort((a, b) => a.teamNumber - b.teamNumber)
+  }
+
+  // 計算價格統計
+  const getPriceStats = (bidsData: Bid[]): PriceStats => {
+    const fulfilled = bidsData.filter(b => (b.quantityFulfilled || 0) > 0)
+
+    if (fulfilled.length === 0) {
+      return {
+        highestPrice: null,
+        lowestPrice: null,
+        totalVolume: 0,
+        totalAmount: 0
+      }
+    }
+
+    return {
+      highestPrice: Math.max(...fulfilled.map(b => b.price)),
+      lowestPrice: Math.min(...fulfilled.map(b => b.price)),
+      totalVolume: fulfilled.reduce((sum, b) => sum + (b.quantityFulfilled || 0), 0),
+      totalAmount: fulfilled.reduce((sum, b) => sum + b.price * (b.quantityFulfilled || 0), 0)
     }
   }
 
-  // 表格欄位定義
-  const columns = [
+  // 團隊分組資料
+  const fishATeamData = useMemo(() => groupByTeam(fishABids), [fishABids])
+  const fishBTeamData = useMemo(() => groupByTeam(fishBBids), [fishBBids])
+
+  // 價格統計資料
+  const fishAStats = useMemo(() => getPriceStats(fishABids), [fishABids])
+  const fishBStats = useMemo(() => getPriceStats(fishBBids), [fishBBids])
+
+  // 團隊明細表格欄位
+  const teamColumns = [
     {
-      title: '團隊',
-      dataIndex: 'teamId',
-      key: 'teamId',
+      title: '組別',
+      dataIndex: 'teamNumber',
+      key: 'teamNumber',
       width: 80,
-      render: (teamId: number) => `第 ${teamId} 隊`,
+      render: (num: number) => `第 ${String(num).padStart(2, '0')} 組`,
     },
     {
-      title: '類型',
-      dataIndex: 'bidType',
-      key: 'bidType',
+      title: '價格1',
+      key: 'price1',
       width: 80,
-      render: (type: string) => (
-        <Tag color={type === 'buy' ? 'blue' : 'green'}>
-          {type === 'buy' ? '買入' : '賣出'}
-        </Tag>
-      ),
+      render: (record: TeamBidSummary) =>
+        record.bids[0] ? `$${record.bids[0].price.toLocaleString()}` : '-',
     },
     {
-      title: '魚種',
-      dataIndex: 'fishType',
-      key: 'fishType',
+      title: '數量1',
+      key: 'quantity1',
       width: 80,
-      render: (type: string) => (
-        <Tag color={type === 'A' ? 'purple' : 'orange'}>
-          {type}級魚
-        </Tag>
-      ),
+      render: (record: TeamBidSummary) =>
+        record.bids[0] ? `${record.bids[0].quantity} kg` : '-',
     },
     {
-      title: '價格',
-      dataIndex: 'price',
-      key: 'price',
-      width: 100,
-      render: (price: number) => `$${price.toLocaleString()}`,
-      sorter: (a: Bid, b: Bid) => a.price - b.price,
+      title: '成交1',
+      key: 'fulfilled1',
+      width: 80,
+      render: (record: TeamBidSummary) =>
+        record.bids[0] ? `${record.bids[0].fulfilled} kg` : '-',
     },
     {
-      title: '投標數量',
-      dataIndex: 'quantitySubmitted',
-      key: 'quantitySubmitted',
-      width: 100,
-      render: (qty: number) => `${qty} kg`,
+      title: '價格2',
+      key: 'price2',
+      width: 80,
+      render: (record: TeamBidSummary) =>
+        record.bids[1] ? `$${record.bids[1].price.toLocaleString()}` : '-',
     },
     {
-      title: '成交數量',
-      dataIndex: 'quantityFulfilled',
-      key: 'quantityFulfilled',
-      width: 100,
-      render: (qty: number | null) => qty !== null ? `${qty} kg` : '-',
+      title: '數量2',
+      key: 'quantity2',
+      width: 80,
+      render: (record: TeamBidSummary) =>
+        record.bids[1] ? `${record.bids[1].quantity} kg` : '-',
     },
     {
-      title: '總金額',
-      dataIndex: 'totalCost',
-      key: 'totalCost',
-      width: 120,
-      render: (cost: number | null) => cost !== null ? `$${cost.toLocaleString()}` : '-',
+      title: '成交2',
+      key: 'fulfilled2',
+      width: 80,
+      render: (record: TeamBidSummary) =>
+        record.bids[1] ? `${record.bids[1].fulfilled} kg` : '-',
     },
     {
-      title: '狀態',
-      key: 'status',
-      width: 120,
-      render: (record: Bid) => getBidStatusTag(record),
+      title: '總成交',
+      dataIndex: 'totalFulfilled',
+      key: 'totalFulfilled',
+      width: 80,
+      render: (qty: number) => qty > 0 ? `${qty} kg` : '-',
     },
     {
       title: '提交時間',
-      dataIndex: 'createdAt',
-      key: 'createdAt',
-      width: 160,
-      render: (time: string) => new Date(time).toLocaleString('zh-TW'),
+      dataIndex: 'latestTime',
+      key: 'latestTime',
+      width: 100,
+      render: (time: string) => {
+        const date = new Date(time)
+        return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}:${String(date.getSeconds()).padStart(2, '0')}`
+      },
     },
   ]
 
-  // 計算統計數據
-  const totalBids = filteredBids.length
-  const buyBids = filteredBids.filter(b => b.bidType === 'buy').length
-  const sellBids = filteredBids.filter(b => b.bidType === 'sell').length
-  const fulfilledBids = filteredBids.filter(b => b.status === 'fulfilled').length
+  // 價格統計卡片元件
+  const PriceStatsCard = ({ title, stats, color }: { title: string; stats: PriceStats; color: string }) => (
+    <Card
+      title={<span style={{ color }}>{title}</span>}
+      size="small"
+      style={{ marginBottom: 16 }}
+    >
+      <Row gutter={16}>
+        <Col span={6}>
+          <Statistic
+            title="最高成交價"
+            value={stats.highestPrice !== null ? stats.highestPrice : '-'}
+            prefix={stats.highestPrice !== null ? '$' : ''}
+            valueStyle={{ fontSize: 18 }}
+          />
+        </Col>
+        <Col span={6}>
+          <Statistic
+            title="最低成交價"
+            value={stats.lowestPrice !== null ? stats.lowestPrice : '-'}
+            prefix={stats.lowestPrice !== null ? '$' : ''}
+            valueStyle={{ fontSize: 18 }}
+          />
+        </Col>
+        <Col span={6}>
+          <Statistic
+            title="總成交量"
+            value={stats.totalVolume}
+            suffix="kg"
+            valueStyle={{ fontSize: 18 }}
+          />
+        </Col>
+        <Col span={6}>
+          <Statistic
+            title="總成交額"
+            value={stats.totalAmount}
+            prefix="$"
+            valueStyle={{ fontSize: 18 }}
+          />
+        </Col>
+      </Row>
+    </Card>
+  )
 
   if (!game) {
     return (
       <Card>
-        <div style={{ textAlign: 'center', padding: '40px 0' }}>
-          <p>目前沒有進行中的遊戲</p>
-        </div>
+        <Empty description="目前沒有進行中的遊戲" />
       </Card>
     )
   }
 
   return (
     <div>
-      <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
-        <Col xs={24} sm={12} md={6}>
-          <Card>
-            <Statistic title="總投標數" value={totalBids} />
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} md={6}>
-          <Card>
-            <Statistic title="買入投標" value={buyBids} valueStyle={{ color: '#1890ff' }} />
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} md={6}>
-          <Card>
-            <Statistic title="賣出投標" value={sellBids} valueStyle={{ color: '#52c41a' }} />
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} md={6}>
-          <Card>
-            <Statistic
-              title="完全成交率"
-              value={totalBids > 0 ? Math.round((fulfilledBids / totalBids) * 100) : 0}
-              suffix="%"
-            />
-          </Card>
-        </Col>
-      </Row>
+      <Title level={3}>競標結果</Title>
 
-      <Card
-        title="競標結果"
-        extra={
+      {/* 篩選控制項 */}
+      <Card style={{ marginBottom: 16 }}>
+        <Space size="large">
           <Space>
-            <span>天數：</span>
+            <Text>天數：</Text>
             <Select
               value={selectedDay}
               style={{ width: 120 }}
@@ -249,43 +346,63 @@ export default function BidsPage() {
                 <Option key={day} value={day}>第 {day} 天</Option>
               ))}
             </Select>
-
-            <span>魚種：</span>
-            <Select
-              value={selectedFishType}
-              style={{ width: 120 }}
-              onChange={setSelectedFishType}
-            >
-              <Option value="all">全部</Option>
-              <Option value="A">A級魚</Option>
-              <Option value="B">B級魚</Option>
-            </Select>
-
-            <span>類型：</span>
-            <Select
-              value={selectedBidType}
-              style={{ width: 120 }}
-              onChange={setSelectedBidType}
-            >
-              <Option value="all">全部</Option>
-              <Option value="buy">買入</Option>
-              <Option value="sell">賣出</Option>
-            </Select>
           </Space>
-        }
+
+          <Space>
+            <Text>階段：</Text>
+            <Radio.Group
+              value={selectedBidType}
+              onChange={(e) => setSelectedBidType(e.target.value)}
+              buttonStyle="solid"
+            >
+              <Radio.Button value="buy">買入</Radio.Button>
+              <Radio.Button value="sell">賣出</Radio.Button>
+            </Radio.Group>
+          </Space>
+        </Space>
+      </Card>
+
+      {/* 成交價格統計 */}
+      <Title level={5} style={{ marginBottom: 12 }}>成交價格統計</Title>
+      <Row gutter={16}>
+        <Col span={12}>
+          <PriceStatsCard title="A 魚" stats={fishAStats} color="#722ed1" />
+        </Col>
+        <Col span={12}>
+          <PriceStatsCard title="B 魚" stats={fishBStats} color="#fa8c16" />
+        </Col>
+      </Row>
+
+      {/* A魚投標明細 */}
+      <Card
+        title={<span style={{ color: '#722ed1' }}>A 魚投標明細</span>}
+        size="small"
+        style={{ marginBottom: 16 }}
       >
         <Table
-          columns={columns}
-          dataSource={filteredBids}
-          rowKey="id"
+          columns={teamColumns}
+          dataSource={fishATeamData}
+          rowKey="teamNumber"
           loading={loading}
-          pagination={{
-            pageSize: 20,
-            showTotal: (total) => `共 ${total} 筆投標記錄`,
-            showSizeChanger: true,
-            pageSizeOptions: ['10', '20', '50', '100'],
-          }}
-          scroll={{ x: 1200 }}
+          pagination={false}
+          size="small"
+          locale={{ emptyText: '暫無投標記錄' }}
+        />
+      </Card>
+
+      {/* B魚投標明細 */}
+      <Card
+        title={<span style={{ color: '#fa8c16' }}>B 魚投標明細</span>}
+        size="small"
+      >
+        <Table
+          columns={teamColumns}
+          dataSource={fishBTeamData}
+          rowKey="teamNumber"
+          loading={loading}
+          pagination={false}
+          size="small"
+          locale={{ emptyText: '暫無投標記錄' }}
         />
       </Card>
     </div>
