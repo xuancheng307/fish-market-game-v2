@@ -141,6 +141,11 @@ class Bid {
             values.push(updates.quantity_submitted);
         }
 
+        if (updates.created_at !== undefined) {
+            fields.push('created_at = ?');
+            values.push(updates.created_at);
+        }
+
         if (fields.length === 0) {
             return await this.findById(id);
         }

@@ -44,29 +44,22 @@ class BidService {
             throw new AppError('找不到團隊，請確認您已加入此遊戲', ERROR_CODES.UNAUTHORIZED, 404);
         }
 
-        // 4. 檢查每種魚最多2個不同價格限制
+        // 4. 檢查同魚種現有標單，若已有2筆則覆寫最早的
         const existingBids = await Bid.findByGameDay(gameId, game.current_day, {
             team_id: team.id,
             bid_type: bidType,
             fish_type: fishType
         });
 
-        const existingPrices = new Set(existingBids.map(b => parseFloat(b.price)));
+        // 按提交時間排序（最早的在前）
+        existingBids.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
 
-        if (existingPrices.has(parseFloat(price))) {
-            throw new AppError(
-                `${fishType}魚該價格已有投標`,
-                ERROR_CODES.DUPLICATE_BID,
-                400
-            );
-        }
+        let bidToOverwrite = null;
 
-        if (existingPrices.size >= 2) {
-            throw new AppError(
-                '每種魚最多2個不同價格',
-                ERROR_CODES.TOO_MANY_BIDS,
-                400
-            );
+        if (existingBids.length >= 2) {
+            // ⚠️ 已有2筆，覆寫最早的那筆
+            bidToOverwrite = existingBids[0];
+            console.log(`[BidService] ${fishType}魚已有2筆標單，將覆寫標單 #${bidToOverwrite.id}`);
         }
 
         // 5. 買入投標：檢查底價和資金
@@ -88,25 +81,37 @@ class BidService {
             const requiredAmount = price * quantity;
             const loanResult = await LoanService.checkAndBorrow(team.id, requiredAmount);
 
-            // 創建投標記錄
-            const bid = await Bid.create({
-                game_id: gameId,
-                game_day_id: gameDay.id,
-                day_number: game.current_day,
-                team_id: team.id,
-                bid_type: bidType,
-                fish_type: fishType,
-                price,
-                quantity_submitted: quantity
-            });
+            let bid;
+            if (bidToOverwrite) {
+                // ⚠️ 覆寫現有標單
+                bid = await Bid.update(bidToOverwrite.id, {
+                    price,
+                    quantity_submitted: quantity,
+                    created_at: new Date()  // 更新提交時間
+                });
+                console.log(`[BidService] 覆寫買入標單 #${bidToOverwrite.id} → 價格:${price}, 數量:${quantity}`);
+            } else {
+                // 創建新標單
+                bid = await Bid.create({
+                    game_id: gameId,
+                    game_day_id: gameDay.id,
+                    day_number: game.current_day,
+                    team_id: team.id,
+                    bid_type: bidType,
+                    fish_type: fishType,
+                    price,
+                    quantity_submitted: quantity
+                });
+            }
 
             return {
                 bid,
-                loanInfo: loanResult
+                loanInfo: loanResult,
+                overwritten: bidToOverwrite ? bidToOverwrite.id : null
             };
         }
 
-        // 5. 賣出投標：檢查庫存
+        // 6. 賣出投標：檢查庫存
         if (bidType === BID_TYPE.SELL) {
             const inventoryField = fishType === 'A' ? 'fish_a_inventory' : 'fish_b_inventory';
             const currentInventory = team[inventoryField];
@@ -124,21 +129,33 @@ class BidService {
                 );
             }
 
-            // 創建投標記錄
-            const bid = await Bid.create({
-                game_id: gameId,
-                game_day_id: gameDay.id,
-                day_number: game.current_day,
-                team_id: team.id,
-                bid_type: bidType,
-                fish_type: fishType,
-                price,
-                quantity_submitted: quantity
-            });
+            let bid;
+            if (bidToOverwrite) {
+                // ⚠️ 覆寫現有標單
+                bid = await Bid.update(bidToOverwrite.id, {
+                    price,
+                    quantity_submitted: quantity,
+                    created_at: new Date()  // 更新提交時間
+                });
+                console.log(`[BidService] 覆寫賣出標單 #${bidToOverwrite.id} → 價格:${price}, 數量:${quantity}`);
+            } else {
+                // 創建新標單
+                bid = await Bid.create({
+                    game_id: gameId,
+                    game_day_id: gameDay.id,
+                    day_number: game.current_day,
+                    team_id: team.id,
+                    bid_type: bidType,
+                    fish_type: fishType,
+                    price,
+                    quantity_submitted: quantity
+                });
+            }
 
             return {
                 bid,
-                loanInfo: null
+                loanInfo: null,
+                overwritten: bidToOverwrite ? bidToOverwrite.id : null
             };
         }
     }
