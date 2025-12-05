@@ -4,118 +4,102 @@
 
 ## 專案概述
 
-這是魚市場遊戲的完全重構版本，解決了原版本的系統性問題：
-- ✅ 統一命名規範 (資料庫 snake_case，API camelCase)
-- ✅ 完全參數化 (所有遊戲參數可調整)
-- ✅ 單一狀態源 (使用 games.phase 管理階段狀態)
-- ✅ 清晰的商業邏輯 (借貸、結算、利息計算)
+這是魚市場遊戲的完全重構版本，採用前後端分離架構：
+- **後端**: Railway (Node.js + Express + MySQL)
+- **前端**: Vercel (Next.js + TypeScript + Ant Design)
 
-## 核心商業邏輯
+### 核心設計原則
+- 統一命名規範：資料庫 `snake_case`，API `camelCase`
+- 單一狀態源：`games.phase` 為唯一階段狀態
+- 完全參數化：所有遊戲參數可調整
 
-### 借貸邏輯
-- 借貸發生在**投標時** (不是結算時)
-- 借貸時現金增加: `cash += loanNeeded`
-- 無退款機制: 借的錢持續計息直到遊戲結束
+## 部署資訊
 
-### 結算邏輯
-- 現金扣除發生在**結算時**
-- 只扣除成交數量的金額: `cash -= price × fulfilledQty`
-- 優先順序: 買入按價格降序、賣出按價格升序，相同價格早提交優先
-
-### 滯銷處理
-- 固定滯銷 2.5%: 最高價投標優先滯銷
-- 滯銷費用: `unsoldQuantity × unsoldFeePerKg`
+| 服務 | 平台 | URL |
+|------|------|-----|
+| 後端 API | Railway | `https://backend-production-42d3.up.railway.app` |
+| 前端 | Vercel | `https://fish-market-game-v2.vercel.app` |
+| 資料庫 | Railway MySQL | 內部連接 |
 
 ## 專案結構
 
 ```
 魚市場遊戲重構/
-├── backend/                    # 後端程式碼
+├── backend/                    # 後端 (Express + MySQL)
 │   ├── src/
 │   │   ├── config/            # 配置 (database, constants)
 │   │   ├── models/            # 資料模型 (返回 snake_case)
 │   │   ├── services/          # 業務邏輯
 │   │   ├── controllers/       # 控制器 (返回 camelCase)
-│   │   ├── routes/            # 路由
-│   │   ├── middleware/        # 中介層
-│   │   ├── utils/             # 工具 (transformers 等)
+│   │   ├── routes/            # API 路由
+│   │   ├── middleware/        # 中介層 (auth, errorHandler)
+│   │   ├── utils/             # 工具 (transformers)
 │   │   └── server.js          # 主伺服器
-│   ├── migrations/            # 資料庫遷移
-│   └── tests/                 # 測試
-├── frontend/                   # 前端程式碼
-│   ├── admin/                 # 管理員介面
-│   ├── team/                  # 團隊介面
-│   ├── shared/                # 共用組件
-│   └── login/                 # 登入頁面
-├── docs/                       # 文檔
-│   └── ARCHITECTURE.md        # 架構文件
-└── README.md                   # 本文件
+│   └── migrations/            # 資料庫遷移腳本
+│
+├── frontend/                   # 前端 (Next.js 14)
+│   ├── app/
+│   │   ├── login/             # 登入頁面
+│   │   ├── admin/             # 管理員介面
+│   │   │   ├── control/       # 遊戲控制
+│   │   │   ├── bids/          # 競標結果
+│   │   │   ├── stats/         # 每日統計
+│   │   │   ├── history/       # 歷史遊戲
+│   │   │   └── accounts/      # 帳號管理
+│   │   └── team/              # 團隊介面
+│   ├── lib/
+│   │   ├── api.ts             # API 客戶端
+│   │   ├── websocket.ts       # WebSocket 連線
+│   │   ├── types.ts           # TypeScript 類型
+│   │   └── constants.ts       # 常數定義
+│   └── components/            # 共用組件
+│
+├── ARCHITECTURE.md            # 架構設計文件
+├── PROJECT_STATUS.md          # 專案狀態文件
+└── README.md                  # 本文件
 ```
 
 ## 技術棧
 
-- **後端**: Node.js, Express, MySQL, Socket.IO
-- **前端**: HTML, CSS, Vanilla JavaScript
-- **認證**: JWT
-- **部署**: Railway
+| 層級 | 技術 |
+|------|------|
+| 後端 | Node.js, Express, MySQL, Socket.IO |
+| 前端 | Next.js 14, TypeScript, Ant Design |
+| 認證 | JWT |
+| 即時通訊 | Socket.IO |
+| 部署 | Railway (後端), Vercel (前端) |
 
-## 安裝與運行
+## 核心商業邏輯
 
-### 前置需求
-- Node.js >= 18.0.0
-- MySQL 8.0
-- Railway CLI (可選)
+### 狀態管理
+- `games.status`: 遊戲整體狀態 (`active`, `paused`, `finished`, `force_ended`)
+- `games.phase`: 當天階段狀態 (`pending`, `buying_open`, `buying_closed`, `selling_open`, `selling_closed`, `settled`)
 
-### 安裝步驟
+### 借貸邏輯
+- 借貸發生在**投標時**（不是結算時）
+- 借貸時現金增加：`cash += loanNeeded`
+- 無退款機制：借的錢持續計息直到遊戲結束
 
-1. 克隆專案
-```bash
-git clone <repository-url>
-cd 魚市場遊戲重構
-```
+### 結算邏輯
+- 現金扣除發生在**結算時**
+- 只扣除成交數量的金額：`cash -= price × fulfilledQty`
+- 買入優先順序：價格高優先，相同價格早提交優先
+- 賣出優先順序：價格低優先，相同價格早提交優先
 
-2. 安裝依賴
-```bash
-cd backend
-npm install
-```
+### 滯銷處理
+- 固定滯銷比例：2.5%
+- 滯銷對象：最高價投標優先滯銷
+- 滯銷費用：`unsoldQuantity × unsoldFeePerKg`
 
-3. 配置環境變數
-```bash
-cp .env.example .env
-# 編輯 .env 填入資料庫連線資訊
-```
+## 預設帳號
 
-4. 初始化資料庫
-```bash
-# 連線到 MySQL 並執行
-mysql -u root -p < migrations/001_initial_schema.sql
-```
-
-5. 啟動伺服器
-```bash
-# 開發模式
-npm run dev
-
-# 生產模式
-npm start
-```
-
-6. 訪問應用
-- 管理員介面: http://localhost:3000/admin.html
-- 團隊介面: http://localhost:3000/team.html
-- 登入頁面: http://localhost:3000/login.html
-
-## API 文檔
-
-詳細的 API 文檔請參考 [ARCHITECTURE.md](ARCHITECTURE.md#五api-設計規範)
-
-主要端點：
-- `POST /api/admin/games` - 創建遊戲
-- `POST /api/admin/games/:id/start-buying` - 開始買入投標
-- `POST /api/admin/games/:id/close-buying` - 關閉買入投標
-- `POST /api/bids` - 提交投標
-- `GET /api/games/:id/my-status` - 獲取我的狀態
+| 角色 | 帳號 | 密碼 |
+|------|------|------|
+| 管理員 | admin | admin |
+| 團隊 01 | 01 | 01 |
+| 團隊 02 | 02 | 02 |
+| ... | ... | ... |
+| 團隊 12 | 12 | 12 |
 
 ## 開發指南
 
@@ -141,84 +125,61 @@ const apiData = {
 
 **轉換使用 transformers**:
 ```javascript
-const { gameToApi, apiToGame } = require('./utils/transformers');
+const { gameToApi, teamToApi } = require('./utils/transformers');
 
 // DB → API
 const apiGame = gameToApi(dbRow);
-
-// API → DB
-const dbGame = apiToGame(apiData);
 ```
 
-### 錯誤處理
+### 階段狀態流程
 
-使用 AppError 類別：
-```javascript
-const { AppError } = require('./middleware/errorHandler');
-const { ERROR_CODES } = require('./config/constants');
-
-throw new AppError(
-    '資金不足，無法投標',
-    ERROR_CODES.INSUFFICIENT_FUNDS,
-    400,
-    { required: 50000, available: 45000 }
-);
+```
+pending → buying_open → buying_closed → selling_open → selling_closed → settled
+                                                                          ↓
+                                                                    (next day)
+                                                                          ↓
+                                                                      pending
 ```
 
-### 狀態管理
+## 部署命令
 
-使用 games.phase 作為唯一階段狀態：
-```javascript
-const { DAY_STATUS } = require('./config/constants');
-
-// 檢查階段
-if (game.phase !== DAY_STATUS.BUYING_OPEN) {
-    throw new AppError('當前不在買入投標階段', ERROR_CODES.INVALID_PHASE, 400);
-}
-
-// 更新階段
-await Game.updatePhase(gameId, DAY_STATUS.BUYING_CLOSED);
-```
-
-## 測試
-
+### 後端部署到 Railway
 ```bash
-# 執行所有測試
-npm test
-
-# 執行測試並監聽變更
-npm run test:watch
+cd backend
+railway up --detach
 ```
 
-## 部署到 Railway
+### 前端部署到 Vercel
+前端已連接 GitHub，推送到 master 分支會自動部署。
 
+### 查看後端日誌
 ```bash
-# 安裝 Railway CLI
-npm install -g @railway/cli
-
-# 登入
-railway login
-
-# 部署
-railway up
+cd backend
+railway logs
 ```
 
-## 貢獻指南
+## 主要 API 端點
 
-1. Fork 專案
-2. 創建功能分支 (`git checkout -b feature/AmazingFeature`)
-3. 提交變更 (`git commit -m 'Add some AmazingFeature'`)
-4. 推送到分支 (`git push origin feature/AmazingFeature`)
-5. 開啟 Pull Request
+### 認證
+- `POST /api/auth/login` - 登入
+- `GET /api/auth/me` - 獲取當前用戶
 
-## 授權
+### 管理員
+- `POST /api/admin/games` - 創建遊戲
+- `GET /api/admin/games` - 獲取遊戲列表
+- `POST /api/admin/games/:id/start-buying` - 開始買入投標
+- `POST /api/admin/games/:id/close-buying` - 關閉買入投標
+- `POST /api/admin/games/:id/start-selling` - 開始賣出投標
+- `POST /api/admin/games/:id/close-selling` - 關閉賣出投標
+- `POST /api/admin/games/:id/settle` - 每日結算
+- `POST /api/admin/games/:id/next-day` - 推進到下一天
 
-MIT License
-
-## 聯絡方式
-
-如有問題或建議，請開啟 Issue。
+### 團隊
+- `GET /api/team/active-game` - 獲取當前遊戲
+- `POST /api/team/bids` - 提交投標
+- `GET /api/team/games/:id/my-status` - 獲取我的狀態
 
 ---
 
-**重構版本 v2.0** - 2025-12-02
+**版本**: v2.0
+**最後更新**: 2025-12-05
