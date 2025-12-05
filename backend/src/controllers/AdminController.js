@@ -1,6 +1,7 @@
 /**
  * AdminController - 管理員控制器
  * ⚠️ 所有回應使用 transformers 轉換為 camelCase
+ * ⚠️ 所有階段變更會透過 Socket.IO 廣播到遊戲房間
  */
 
 const GameService = require('../services/GameService');
@@ -16,6 +17,21 @@ const {
     apiToGame
 } = require('../utils/transformers');
 const { asyncHandler } = require('../middleware/errorHandler');
+
+/**
+ * 廣播遊戲事件到所有連接的客戶端
+ * @param {object} req - Express request 物件
+ * @param {number} gameId - 遊戲 ID
+ * @param {string} event - 事件名稱
+ * @param {object} data - 事件資料
+ */
+const broadcastToGame = (req, gameId, event, data) => {
+    const io = req.app.get('io');
+    if (io) {
+        io.to(`game-${gameId}`).emit(event, data);
+        console.log(`[Socket.IO] 廣播事件 ${event} 到遊戲 ${gameId}`);
+    }
+};
 
 class AdminController {
     /**
@@ -67,6 +83,12 @@ class AdminController {
     static startBuying = asyncHandler(async (req, res) => {
         const game = await GameService.startBuying(req.params.id, req.body);
 
+        // ⚠️ 廣播階段變更
+        broadcastToGame(req, req.params.id, 'phaseChange', {
+            phase: game.phase,
+            game: gameToApi(game)
+        });
+
         res.json({
             success: true,
             message: '買入投標已開始',
@@ -79,6 +101,12 @@ class AdminController {
      */
     static closeBuying = asyncHandler(async (req, res) => {
         const result = await GameService.closeBuying(req.params.id);
+
+        // ⚠️ 廣播階段變更
+        broadcastToGame(req, req.params.id, 'phaseChange', {
+            phase: result.game.phase,
+            game: gameToApi(result.game)
+        });
 
         res.json({
             success: true,
@@ -96,6 +124,12 @@ class AdminController {
     static startSelling = asyncHandler(async (req, res) => {
         const game = await GameService.startSelling(req.params.id, req.body);
 
+        // ⚠️ 廣播階段變更
+        broadcastToGame(req, req.params.id, 'phaseChange', {
+            phase: game.phase,
+            game: gameToApi(game)
+        });
+
         res.json({
             success: true,
             message: '賣出投標已開始',
@@ -108,6 +142,12 @@ class AdminController {
      */
     static closeSelling = asyncHandler(async (req, res) => {
         const result = await GameService.closeSelling(req.params.id);
+
+        // ⚠️ 廣播階段變更
+        broadcastToGame(req, req.params.id, 'phaseChange', {
+            phase: result.game.phase,
+            game: gameToApi(result.game)
+        });
 
         res.json({
             success: true,
@@ -125,6 +165,13 @@ class AdminController {
     static settle = asyncHandler(async (req, res) => {
         const result = await GameService.settle(req.params.id);
 
+        // ⚠️ 廣播結算完成
+        broadcastToGame(req, req.params.id, 'settlementComplete', {
+            phase: result.game.phase,
+            game: gameToApi(result.game),
+            results: result.settlementResults
+        });
+
         res.json({
             success: true,
             message: '每日結算完成',
@@ -140,6 +187,13 @@ class AdminController {
      */
     static nextDay = asyncHandler(async (req, res) => {
         const result = await GameService.nextDay(req.params.id);
+
+        // ⚠️ 廣播遊戲更新（進入下一天或遊戲結束）
+        broadcastToGame(req, req.params.id, 'gameUpdate', {
+            phase: result.game.phase,
+            game: gameToApi(result.game),
+            finished: result.finished
+        });
 
         if (result.finished) {
             res.json({
@@ -168,6 +222,14 @@ class AdminController {
     static forceEnd = asyncHandler(async (req, res) => {
         const game = await GameService.forceEnd(req.params.id);
 
+        // ⚠️ 廣播遊戲強制結束
+        broadcastToGame(req, req.params.id, 'gameUpdate', {
+            phase: game.phase,
+            game: gameToApi(game),
+            status: game.status,
+            forceEnded: true
+        });
+
         res.json({
             success: true,
             message: '遊戲已強制結束',
@@ -181,6 +243,14 @@ class AdminController {
     static pause = asyncHandler(async (req, res) => {
         const game = await GameService.pause(req.params.id);
 
+        // ⚠️ 廣播遊戲暫停
+        broadcastToGame(req, req.params.id, 'gameUpdate', {
+            phase: game.phase,
+            game: gameToApi(game),
+            status: game.status,
+            paused: true
+        });
+
         res.json({
             success: true,
             message: '遊戲已暫停',
@@ -193,6 +263,14 @@ class AdminController {
      */
     static resume = asyncHandler(async (req, res) => {
         const game = await GameService.resume(req.params.id);
+
+        // ⚠️ 廣播遊戲恢復
+        broadcastToGame(req, req.params.id, 'gameUpdate', {
+            phase: game.phase,
+            game: gameToApi(game),
+            status: game.status,
+            resumed: true
+        });
 
         res.json({
             success: true,

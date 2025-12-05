@@ -58,14 +58,16 @@ app.get('/api/health', (req, res) => {
 io.on('connection', (socket) => {
     console.log(`[Socket.IO] 新連接: ${socket.id}`);
 
-    // 加入遊戲房間
-    socket.on('join-game', (gameId) => {
+    // 加入遊戲房間（支援兩種格式：物件或純數字）
+    socket.on('joinGame', (data) => {
+        const gameId = typeof data === 'object' ? data.gameId : data;
         socket.join(`game-${gameId}`);
         console.log(`[Socket.IO] ${socket.id} 加入遊戲 ${gameId}`);
     });
 
-    // 離開遊戲房間
-    socket.on('leave-game', (gameId) => {
+    // 離開遊戲房間（支援兩種格式）
+    socket.on('leaveGame', (data) => {
+        const gameId = typeof data === 'object' ? data.gameId : data;
         socket.leave(`game-${gameId}`);
         console.log(`[Socket.IO] ${socket.id} 離開遊戲 ${gameId}`);
     });

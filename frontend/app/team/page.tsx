@@ -85,7 +85,7 @@ export default function TeamHomePage() {
   useEffect(() => {
     loadData()
 
-    // 監聽 WebSocket 更新
+    // 監聯 WebSocket 更新
     wsClient.onPhaseChange(() => {
       loadData()
     })
@@ -98,12 +98,24 @@ export default function TeamHomePage() {
       handleSettlementComplete()
     })
 
+    wsClient.onGameUpdate(() => {
+      loadData()
+    })
+
     return () => {
       wsClient.off('phaseChange')
       wsClient.off('bidSubmitted')
       wsClient.off('settlementComplete')
+      wsClient.off('gameUpdate')
     }
   }, [])
+
+  // ⚠️ 加入遊戲房間以接收廣播
+  useEffect(() => {
+    if (game?.id) {
+      wsClient.joinGame(game.id)
+    }
+  }, [game?.id])
 
   // 提交投標（8欄位一次提交，拆分成最多4筆投標）
   const handleSubmitBid = async (values: any) => {

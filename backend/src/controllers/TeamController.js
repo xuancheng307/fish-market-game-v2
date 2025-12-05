@@ -1,6 +1,7 @@
 /**
  * TeamController - 團隊控制器
  * ⚠️ 所有回應使用 transformers 轉換為 camelCase
+ * ⚠️ 投標提交會透過 Socket.IO 廣播到遊戲房間
  */
 
 const BidService = require('../services/BidService');
@@ -15,6 +16,17 @@ const {
     gameDayToApi
 } = require('../utils/transformers');
 const { asyncHandler } = require('../middleware/errorHandler');
+
+/**
+ * 廣播遊戲事件到所有連接的客戶端
+ */
+const broadcastToGame = (req, gameId, event, data) => {
+    const io = req.app.get('io');
+    if (io) {
+        io.to(`game-${gameId}`).emit(event, data);
+        console.log(`[Socket.IO] 廣播事件 ${event} 到遊戲 ${gameId}`);
+    }
+};
 
 class TeamController {
     /**
@@ -63,6 +75,14 @@ class TeamController {
      */
     static submitBid = asyncHandler(async (req, res) => {
         const result = await BidService.submitBid(req.user.id, req.body);
+
+        // ⚠️ 廣播投標提交事件（讓 admin 即時看到）
+        const bid = result.bid;
+        broadcastToGame(req, bid.game_id, 'bidSubmitted', {
+            teamId: bid.team_id,
+            bidType: bid.bid_type,
+            fishType: bid.fish_type
+        });
 
         res.json({
             success: true,

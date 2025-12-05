@@ -350,18 +350,32 @@ export default function GameControlPage() {
     // 獲取已投標的團隊 ID
     const teamsBidded = new Set(currentPhaseBids.map(bid => bid.teamId))
 
-    // 分類團隊
-    const biddedTeams = teams.filter(team => teamsBidded.has(team.id))
-    const notBiddedTeams = teams.filter(team => !teamsBidded.has(team.id))
+    // ⚠️ 賣出階段：只有有庫存的團隊才需要投標
+    let eligibleTeams = teams
+    if (currentPhase === 'sell') {
+      eligibleTeams = teams.filter(team =>
+        (team.fishAInventory || 0) > 0 || (team.fishBInventory || 0) > 0
+      )
+    }
+
+    // 分類團隊（基於可投標團隊）
+    const biddedTeams = eligibleTeams.filter(team => teamsBidded.has(team.id))
+    const notBiddedTeams = eligibleTeams.filter(team => !teamsBidded.has(team.id))
+
+    // 沒有庫存的團隊（賣出階段顯示）
+    const noInventoryTeams = currentPhase === 'sell'
+      ? teams.filter(team => (team.fishAInventory || 0) === 0 && (team.fishBInventory || 0) === 0)
+      : []
 
     return {
       phase: currentPhase,
       phaseName: currentPhase === 'buy' ? '買入' : '賣出',
-      total: teams.length,
+      total: eligibleTeams.length,
       bidded: biddedTeams.length,
       biddedTeams,
       notBiddedTeams,
-      progress: Math.round((biddedTeams.length / teams.length) * 100)
+      noInventoryTeams,
+      progress: eligibleTeams.length > 0 ? Math.round((biddedTeams.length / eligibleTeams.length) * 100) : 100
     }
   }
 
@@ -595,7 +609,7 @@ export default function GameControlPage() {
 
               {biddingProgress.notBiddedTeams.length > 0 && (
                 <Alert
-                  message="尚未投標的團隊"
+                  message={`尚未投標的團隊（${biddingProgress.notBiddedTeams.length} 隊）`}
                   description={
                     <Space wrap>
                       {biddingProgress.notBiddedTeams.map(team => (
@@ -606,6 +620,24 @@ export default function GameControlPage() {
                     </Space>
                   }
                   type="warning"
+                  showIcon
+                  style={{ marginTop: 16 }}
+                />
+              )}
+
+              {biddingProgress.noInventoryTeams && biddingProgress.noInventoryTeams.length > 0 && (
+                <Alert
+                  message={`無庫存團隊（${biddingProgress.noInventoryTeams.length} 隊，無需投標）`}
+                  description={
+                    <Space wrap>
+                      {biddingProgress.noInventoryTeams.map(team => (
+                        <Tag key={team.id} color="default">
+                          {team.teamName}
+                        </Tag>
+                      ))}
+                    </Space>
+                  }
+                  type="info"
                   showIcon
                   style={{ marginTop: 16 }}
                 />

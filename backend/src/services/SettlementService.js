@@ -160,9 +160,9 @@ class SettlementService {
      * ⚠️ 關鍵邏輯：
      * 1. 先從最高價扣除 2.5% 作為滯銷
      * 2. 從最低價開始用餐廳資金購買
-     * 3. 餐廳沒錢後剩餘的不成交
+     * 3. 餐廳沒錢後剩餘的不成交（也收滯銷費）
      * 4. 當日結束所有庫存清零
-     * ⚠️ 結算後立即更新 daily_results 的賣出成交量
+     * ⚠️ 結算後立即更新 daily_results 的賣出成交量和滯銷費
      */
     static async settleSellingPhase(gameId, dayNumber) {
         const gameDay = await GameDay.findByGameAndDay(gameId, dayNumber);
@@ -177,18 +177,21 @@ class SettlementService {
             fishB: await this._settleSellingForFishType(gameId, dayNumber, FISH_TYPE.B, game, gameDay)
         };
 
-        // ⚠️ 立即更新 daily_results 的賣出成交量
-        await this._updateSellingResults(gameId, gameDay.id, dayNumber);
+        // ⚠️ 立即更新 daily_results 的賣出成交量和滯銷費
+        await this._updateSellingResults(gameId, gameDay.id, dayNumber, results);
 
         return results;
     }
 
     /**
-     * 更新每隊的賣出成交量到 daily_results
+     * 更新每隊的賣出成交量和滯銷費到 daily_results
+     * ⚠️ 滯銷費已在賣出結算時從現金扣除，這裡只是記錄到 daily_results
      */
-    static async _updateSellingResults(gameId, gameDayId, dayNumber) {
+    static async _updateSellingResults(gameId, gameDayId, dayNumber, settlementResults) {
         const teams = await Team.findByGame(gameId);
+        const game = await Game.findById(gameId);
         const { BID_TYPE, FISH_TYPE } = require('../config/constants');
+        const unsoldFeePerKg = parseFloat(game.unsold_fee_per_kg);
 
         for (const team of teams) {
             // 從 bids 表彙總賣出成交量
@@ -196,20 +199,33 @@ class SettlementService {
 
             let fishASold = 0;
             let fishBSold = 0;
+            let fishASubmitted = 0;
+            let fishBSubmitted = 0;
 
             for (const bid of bids) {
-                const qty = bid.quantity_fulfilled || 0;
+                const fulfilled = bid.quantity_fulfilled || 0;
+                const submitted = bid.quantity_submitted || 0;
                 if (bid.fish_type === FISH_TYPE.A) {
-                    fishASold += qty;
+                    fishASold += fulfilled;
+                    fishASubmitted += submitted;
                 } else if (bid.fish_type === FISH_TYPE.B) {
-                    fishBSold += qty;
+                    fishBSold += fulfilled;
+                    fishBSubmitted += submitted;
                 }
             }
+
+            // ⚠️ 計算該團隊的實際滯銷量（投標量 - 成交量）
+            const fishAUnsold = fishASubmitted - fishASold;
+            const fishBUnsold = fishBSubmitted - fishBSold;
+            const totalUnsoldFee = (fishAUnsold + fishBUnsold) * unsoldFeePerKg;
 
             // 更新 daily_results 記錄 (應該已存在，由買入結算創建)
             await DailyResult.upsertPartial(gameId, gameDayId, team.id, dayNumber, {
                 fish_a_sold: fishASold,
-                fish_b_sold: fishBSold
+                fish_b_sold: fishBSold,
+                fish_a_unsold: fishAUnsold,
+                fish_b_unsold: fishBUnsold,
+                unsold_fee: totalUnsoldFee
             });
         }
     }
@@ -304,7 +320,7 @@ class SettlementService {
             const team = await Team.findById(bid.team_id);
             if (!team) continue;
 
-            // 計算可賣數量（扣除滯銷部分）
+            // 計算可賣數量（扣除強制滯銷部分）
             const unsoldForThisBid = bidUnsoldMap.get(bid.id) || 0;
             const sellableQty = bid.quantity_submitted - unsoldForThisBid;
 
@@ -317,6 +333,9 @@ class SettlementService {
             const price = parseFloat(bid.price);
             const maxAffordable = price > 0 ? Math.floor(remainingBudget / price) : 0;
             const fulfilledQty = Math.min(sellableQty, maxAffordable);
+
+            // ⚠️ 餐廳買不起的部分 = 額外滯銷（也要收滯銷費）
+            const extraUnsoldQty = sellableQty - fulfilledQty;
 
             if (fulfilledQty > 0) {
                 const revenue = price * fulfilledQty;
@@ -338,8 +357,27 @@ class SettlementService {
                 totalSold += fulfilledQty;
                 totalRevenue += revenue;  // 記錄收入用於利潤計算
             } else {
-                // 餐廳沒錢了，標記為未成交
+                // 餐廳完全沒錢了，標記為未成交
                 await Bid.updateFulfillment(bid.id, 0);
+            }
+
+            // ⚠️ 處理額外滯銷（餐廳買不起的部分）
+            if (extraUnsoldQty > 0) {
+                const extraUnsoldPenalty = extraUnsoldQty * unsoldFeePerKg;
+                const inventoryField = fishType === FISH_TYPE.A ? 'fish_a_inventory' : 'fish_b_inventory';
+
+                // 重新讀取團隊最新狀態（因為上面可能已更新）
+                const updatedTeam = await Team.findById(bid.team_id);
+                const currentInventory = fishType === FISH_TYPE.A ? updatedTeam.fish_a_inventory : updatedTeam.fish_b_inventory;
+                const newInventory = Math.max(0, currentInventory - extraUnsoldQty);
+
+                await Team.update(bid.team_id, {
+                    cash: parseFloat(updatedTeam.cash) - extraUnsoldPenalty,
+                    [inventoryField]: newInventory
+                });
+
+                totalUnsold += extraUnsoldQty;
+                totalUnsoldPenalty += extraUnsoldPenalty;
             }
         }
 
@@ -380,6 +418,7 @@ class SettlementService {
      * ⚠️ 周結制：
      * - 累積利潤 = 歷日利潤加總（不是現金計算）
      * - ROI = 累積利潤 / (初始預算 + 借貸總額)
+     * - 滯銷費已在賣出結算時扣除並記錄，這裡直接讀取
      */
     static async dailySettlement(gameId, dayNumber) {
         const teams = await Team.findByGame(gameId);
@@ -422,18 +461,16 @@ class SettlementService {
                 }
             }
 
-            // 3. 計算滯銷數量 (買入 - 賣出 = 滯銷)
-            const fishAUnsold = Math.max(0, fishAPurchased - fishASold);
-            const fishBUnsold = Math.max(0, fishBPurchased - fishBSold);
+            // 3. ⚠️ 從 daily_results 讀取滯銷費（已在賣出結算時計算並記錄）
+            const existingResult = await DailyResult.findByTeamAndDay(team.id, gameId, dayNumber);
+            const totalUnsoldFee = existingResult ? parseFloat(existingResult.unsold_fee) || 0 : 0;
+            const fishAUnsold = existingResult ? existingResult.fish_a_unsold || 0 : 0;
+            const fishBUnsold = existingResult ? existingResult.fish_b_unsold || 0 : 0;
 
-            // 4. 計算滯銷費用
-            const unsoldFeePerKg = parseFloat(game.unsold_fee_per_kg);
-            const totalUnsoldFee = (fishAUnsold + fishBUnsold) * unsoldFeePerKg;
-
-            // 5. 計算當日利潤
+            // 4. 計算當日利潤（滯銷費已在賣出結算時從現金扣除）
             const dailyProfit = totalRevenue - totalCost - totalUnsoldFee - interestResult.interest;
 
-            // 6. ⚠️ 周結制：累積利潤 = 前日累積利潤 + 當日利潤
+            // 5. ⚠️ 周結制：累積利潤 = 前日累積利潤 + 當日利潤
             const previousDayResult = dayNumber > 1
                 ? await DailyResult.findByTeamAndDay(team.id, gameId, dayNumber - 1)
                 : null;
@@ -442,23 +479,23 @@ class SettlementService {
                 : 0;
             const cumulativeProfit = previousCumulativeProfit + dailyProfit;
 
-            // 7. ⚠️ ROI = 累積利潤 / (初始預算 + 借貸總額)
+            // 6. ⚠️ ROI = 累積利潤 / (初始預算 + 借貸總額)
             const totalInvestment = parseFloat(game.initial_budget) + parseFloat(totalLoan);
             const roi = totalInvestment > 0 ? cumulativeProfit / totalInvestment : 0;
 
-            // 8. 更新團隊狀態
+            // 7. 更新團隊狀態
             await Team.update(team.id, {
                 cumulative_profit: cumulativeProfit,
                 roi: roi
             });
 
-            // 9. 更新每日結果（記錄已在買入/賣出結算時創建，這裡更新財務數據）
+            // 8. 更新每日結果（記錄已在買入/賣出結算時創建，這裡更新財務數據）
             const dailyResult = await DailyResult.upsertPartial(gameId, gameDay ? gameDay.id : null, team.id, dayNumber, {
                 revenue: totalRevenue,
                 cost: totalCost,
                 profit: dailyProfit,
                 interest_paid: interestResult.interest,
-                unsold_fee: totalUnsoldFee,
+                // unsold_fee 已在 _updateSellingResults 記錄，不再覆蓋
                 cash: cash,
                 total_loan: totalLoan,
                 fish_a_inventory: team.fish_a_inventory,
@@ -467,8 +504,7 @@ class SettlementService {
                 fish_a_sold: fishASold,
                 fish_b_purchased: fishBPurchased,
                 fish_b_sold: fishBSold,
-                fish_a_unsold: fishAUnsold,
-                fish_b_unsold: fishBUnsold,
+                // fish_a_unsold, fish_b_unsold 已在 _updateSellingResults 記錄，不再覆蓋
                 cumulative_profit: cumulativeProfit,
                 roi: roi
             });
