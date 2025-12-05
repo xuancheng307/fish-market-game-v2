@@ -39,7 +39,9 @@ class GameService {
             default_fish_a_supply,
             default_fish_b_supply,
             default_fish_a_restaurant_budget,
-            default_fish_b_restaurant_budget
+            default_fish_b_restaurant_budget,
+            // 新增：庫存設定
+            clear_inventory_daily
         } = gameData;
 
         // 如果沒有提供 team_names，根據 num_teams 自動生成
@@ -74,6 +76,8 @@ class GameService {
             if (default_fish_b_supply !== undefined) createData.default_fish_b_supply = default_fish_b_supply;
             if (default_fish_a_restaurant_budget !== undefined) createData.default_fish_a_restaurant_budget = default_fish_a_restaurant_budget;
             if (default_fish_b_restaurant_budget !== undefined) createData.default_fish_b_restaurant_budget = default_fish_b_restaurant_budget;
+            // 新增：庫存設定
+            if (clear_inventory_daily !== undefined) createData.clear_inventory_daily = clear_inventory_daily;
             if (team_names !== undefined) createData.team_names = team_names;
 
             const game = await Game.create(createData);

@@ -68,6 +68,8 @@ class Game {
             default_fish_b_restaurant_budget = 50000,
             buying_duration = DEFAULT_GAME_PARAMS.BUYING_DURATION,
             selling_duration = DEFAULT_GAME_PARAMS.SELLING_DURATION,
+            // 新增：庫存設定
+            clear_inventory_daily = 1,
             team_names = null
         } = gameData;
 
@@ -80,8 +82,8 @@ class Game {
                 target_price_a, target_price_b,
                 default_fish_a_supply, default_fish_b_supply,
                 default_fish_a_restaurant_budget, default_fish_b_restaurant_budget,
-                buying_duration, selling_duration, team_names
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                buying_duration, selling_duration, clear_inventory_daily, team_names
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
                 name, description, GAME_STATUS.ACTIVE, total_days, 1, num_teams,
                 initial_budget, daily_interest_rate, loan_interest_rate, max_loan_ratio,
@@ -90,7 +92,7 @@ class Game {
                 target_price_a, target_price_b,
                 default_fish_a_supply, default_fish_b_supply,
                 default_fish_a_restaurant_budget, default_fish_b_restaurant_budget,
-                buying_duration, selling_duration,
+                buying_duration, selling_duration, clear_inventory_daily,
                 team_names ? JSON.stringify(team_names) : null
             ]
         );
