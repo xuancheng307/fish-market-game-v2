@@ -51,6 +51,8 @@ function errorHandler(err, req, res, next) {
         statusCode = 500;
         code = ERROR_CODES.DATABASE_ERROR;
         message = '資料庫錯誤';
+        // 始終在日誌中記錄 SQL 錯誤詳情
+        console.error('[MySQL Error]', err.code, err.sqlMessage, err.sql);
         details = process.env.NODE_ENV === 'development' ? { sqlError: err.code, sqlMessage: err.sqlMessage } : null;
     }
 
@@ -60,7 +62,8 @@ function errorHandler(err, req, res, next) {
         code: code,
         statusCode: statusCode,
         stack: process.env.NODE_ENV === 'development' ? err.stack : undefined,
-        details: details
+        details: details,
+        originalError: err.code && err.code.startsWith('ER_') ? { code: err.code, sqlMessage: err.sqlMessage } : undefined
     });
 
     // 返回錯誤響應
