@@ -44,11 +44,26 @@ class GameService {
         } = gameData;
 
         // 如果沒有提供 team_names，根據 num_teams 自動生成
+        // ⚠️ team_names 可能是陣列或 JSON 字串（從 apiToGame 轉換而來）
         let team_names = gameData.team_names;
-        if (!team_names && num_teams) {
-            team_names = [];
-            for (let i = 1; i <= num_teams; i++) {
-                team_names.push(`第 ${String(i).padStart(2, '0')} 組`);
+
+        // 如果是 JSON 字串，先解析成陣列
+        if (typeof team_names === 'string') {
+            try {
+                team_names = JSON.parse(team_names);
+            } catch (e) {
+                console.error('[GameService] team_names JSON 解析失敗:', e);
+                team_names = null;
+            }
+        }
+
+        // 如果沒有 team_names 或不是陣列，根據 num_teams 自動生成
+        if (!team_names || !Array.isArray(team_names)) {
+            if (num_teams) {
+                team_names = [];
+                for (let i = 1; i <= num_teams; i++) {
+                    team_names.push(`第 ${String(i).padStart(2, '0')} 組`);
+                }
             }
         }
 
