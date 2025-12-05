@@ -122,11 +122,11 @@ export default function StatsPage() {
       key: 'cumulativeProfit',
       width: 140,
       render: (profit: number) => (
-        <span style={{ color: profit > 0 ? '#52c41a' : profit < 0 ? '#ff4d4f' : '#000' }}>
-          ${profit.toLocaleString()}
+        <span style={{ color: (profit || 0) > 0 ? '#52c41a' : (profit || 0) < 0 ? '#ff4d4f' : '#000' }}>
+          ${(profit || 0).toLocaleString()}
         </span>
       ),
-      sorter: (a: DailyResult, b: DailyResult) => b.cumulativeProfit - a.cumulativeProfit,
+      sorter: (a: DailyResult, b: DailyResult) => (b.cumulativeProfit || 0) - (a.cumulativeProfit || 0),
     },
     {
       title: '當日收益',
@@ -134,80 +134,73 @@ export default function StatsPage() {
       key: 'dailyProfit',
       width: 140,
       render: (profit: number) => (
-        <span style={{ color: profit > 0 ? '#52c41a' : profit < 0 ? '#ff4d4f' : '#000' }}>
-          ${profit.toLocaleString()}
+        <span style={{ color: (profit || 0) > 0 ? '#52c41a' : (profit || 0) < 0 ? '#ff4d4f' : '#000' }}>
+          ${(profit || 0).toLocaleString()}
         </span>
       ),
-    },
-    {
-      title: '期初現金',
-      dataIndex: 'dayStartCash',
-      key: 'dayStartCash',
-      width: 140,
-      render: (cash: number) => `$${cash.toLocaleString()}`,
     },
     {
       title: '期末現金',
       dataIndex: 'dayEndCash',
       key: 'dayEndCash',
       width: 140,
-      render: (cash: number) => `$${cash.toLocaleString()}`,
+      render: (cash: number) => cash != null ? `$${cash.toLocaleString()}` : '-',
     },
     {
       title: '買入A',
       dataIndex: 'fishAPurchased',
       key: 'fishAPurchased',
       width: 100,
-      render: (qty: number) => `${qty} kg`,
+      render: (qty: number) => `${qty || 0} kg`,
     },
     {
       title: '賣出A',
       dataIndex: 'fishASold',
       key: 'fishASold',
       width: 100,
-      render: (qty: number) => `${qty} kg`,
+      render: (qty: number) => `${qty || 0} kg`,
     },
     {
       title: '買入B',
       dataIndex: 'fishBPurchased',
       key: 'fishBPurchased',
       width: 100,
-      render: (qty: number) => `${qty} kg`,
+      render: (qty: number) => `${qty || 0} kg`,
     },
     {
       title: '賣出B',
       dataIndex: 'fishBSold',
       key: 'fishBSold',
       width: 100,
-      render: (qty: number) => `${qty} kg`,
+      render: (qty: number) => `${qty || 0} kg`,
     },
     {
       title: '總收入',
       dataIndex: 'totalRevenue',
       key: 'totalRevenue',
       width: 120,
-      render: (revenue: number) => `$${revenue.toLocaleString()}`,
+      render: (revenue: number) => `$${(revenue || 0).toLocaleString()}`,
     },
     {
       title: '總成本',
       dataIndex: 'totalCost',
       key: 'totalCost',
       width: 120,
-      render: (cost: number) => `$${cost.toLocaleString()}`,
+      render: (cost: number) => `$${(cost || 0).toLocaleString()}`,
     },
     {
       title: '滯銷罰金',
       dataIndex: 'unsoldPenalty',
       key: 'unsoldPenalty',
       width: 120,
-      render: (penalty: number) => penalty > 0 ? <span style={{ color: '#ff4d4f' }}>-${penalty.toLocaleString()}</span> : '-',
+      render: (penalty: number) => (penalty || 0) > 0 ? <span style={{ color: '#ff4d4f' }}>-${(penalty || 0).toLocaleString()}</span> : '-',
     },
     {
       title: '貸款利息',
       dataIndex: 'loanInterest',
       key: 'loanInterest',
       width: 120,
-      render: (interest: number) => interest > 0 ? <span style={{ color: '#ff4d4f' }}>-${interest.toLocaleString()}</span> : '-',
+      render: (interest: number) => (interest || 0) > 0 ? <span style={{ color: '#ff4d4f' }}>-${(interest || 0).toLocaleString()}</span> : '-',
     },
   ]
 

@@ -196,9 +196,9 @@ export default function TeamStatsPage() {
       key: 'roi',
       width: 120,
       render: (roi: number) => (
-        <Tag color={roi > 0 ? 'success' : roi < 0 ? 'error' : 'default'}>
-          {roi > 0 ? <RiseOutlined /> : roi < 0 ? <FallOutlined /> : null}
-          {' '}{(roi * 100).toFixed(2)}%
+        <Tag color={(roi || 0) > 0 ? 'success' : (roi || 0) < 0 ? 'error' : 'default'}>
+          {(roi || 0) > 0 ? <RiseOutlined /> : (roi || 0) < 0 ? <FallOutlined /> : null}
+          {' '}{((roi || 0) * 100).toFixed(2)}%
         </Tag>
       ),
     },
@@ -208,8 +208,8 @@ export default function TeamStatsPage() {
       key: 'dailyProfit',
       width: 120,
       render: (profit: number) => (
-        <span style={{ color: profit > 0 ? '#52c41a' : profit < 0 ? '#ff4d4f' : '#000' }}>
-          ${profit.toLocaleString()}
+        <span style={{ color: (profit || 0) > 0 ? '#52c41a' : (profit || 0) < 0 ? '#ff4d4f' : '#000' }}>
+          ${(profit || 0).toLocaleString()}
         </span>
       ),
     },
@@ -219,8 +219,8 @@ export default function TeamStatsPage() {
       key: 'cumulativeProfit',
       width: 140,
       render: (profit: number) => (
-        <span style={{ color: profit > 0 ? '#52c41a' : profit < 0 ? '#ff4d4f' : '#000', fontWeight: 'bold' }}>
-          ${profit.toLocaleString()}
+        <span style={{ color: (profit || 0) > 0 ? '#52c41a' : (profit || 0) < 0 ? '#ff4d4f' : '#000', fontWeight: 'bold' }}>
+          ${(profit || 0).toLocaleString()}
         </span>
       ),
     },
@@ -229,49 +229,49 @@ export default function TeamStatsPage() {
       dataIndex: 'dayEndCash',
       key: 'dayEndCash',
       width: 120,
-      render: (cash: number) => `$${cash.toLocaleString()}`,
+      render: (cash: number) => cash != null ? `$${cash.toLocaleString()}` : '-',
     },
     {
       title: '買入A',
       dataIndex: 'fishAPurchased',
       key: 'fishAPurchased',
       width: 100,
-      render: (qty: number) => `${qty} kg`,
+      render: (qty: number) => `${qty || 0} kg`,
     },
     {
       title: '賣出A',
       dataIndex: 'fishASold',
       key: 'fishASold',
       width: 100,
-      render: (qty: number) => `${qty} kg`,
+      render: (qty: number) => `${qty || 0} kg`,
     },
     {
       title: '買入B',
       dataIndex: 'fishBPurchased',
       key: 'fishBPurchased',
       width: 100,
-      render: (qty: number) => `${qty} kg`,
+      render: (qty: number) => `${qty || 0} kg`,
     },
     {
       title: '賣出B',
       dataIndex: 'fishBSold',
       key: 'fishBSold',
       width: 100,
-      render: (qty: number) => `${qty} kg`,
+      render: (qty: number) => `${qty || 0} kg`,
     },
     {
       title: '總收入',
       dataIndex: 'totalRevenue',
       key: 'totalRevenue',
       width: 120,
-      render: (revenue: number) => `$${revenue.toLocaleString()}`,
+      render: (revenue: number) => `$${(revenue || 0).toLocaleString()}`,
     },
     {
       title: '總成本',
       dataIndex: 'totalCost',
       key: 'totalCost',
       width: 120,
-      render: (cost: number) => `$${cost.toLocaleString()}`,
+      render: (cost: number) => `$${(cost || 0).toLocaleString()}`,
     },
   ]
 
