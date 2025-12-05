@@ -9,10 +9,13 @@ import {
   DollarOutlined,
   ShoppingOutlined,
 } from '@ant-design/icons'
-import ReactECharts from 'echarts-for-react'
+import dynamic from 'next/dynamic'
 import { api } from '@/lib/api'
 import { wsClient } from '@/lib/websocket'
 import type { Game, DailyResult, Bid } from '@/lib/types'
+
+// 動態載入 echarts 避免 SSR 問題
+const ReactECharts = dynamic(() => import('echarts-for-react'), { ssr: false })
 
 export default function TeamStatsPage() {
   const [game, setGame] = useState<Game | null>(null)

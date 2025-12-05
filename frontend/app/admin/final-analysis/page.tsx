@@ -11,9 +11,12 @@ import {
   LineChartOutlined,
   BarChartOutlined,
 } from '@ant-design/icons'
-import ReactECharts from 'echarts-for-react'
+import dynamic from 'next/dynamic'
 import { api } from '@/lib/api'
 import type { Game, DailyResult } from '@/lib/types'
+
+// 動態載入 echarts 避免 SSR 問題
+const ReactECharts = dynamic(() => import('echarts-for-react'), { ssr: false })
 
 const { TabPane } = Tabs
 
