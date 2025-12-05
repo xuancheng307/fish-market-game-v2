@@ -90,7 +90,7 @@ export default function TeamLayout({
 
     // 監聽 WebSocket 更新
     wsClient.onPhaseChange((data) => {
-      message.info(`階段變更：${STATUS_DISPLAY_TEXT[data.status] || data.status}`)
+      message.info(`階段變更：${STATUS_DISPLAY_TEXT[data.phase] || data.phase}`)
       loadData()
     })
 
@@ -153,14 +153,14 @@ export default function TeamLayout({
             <Space>
               <ConnectionStatusIndicator />
               {game && (
-                <Tag color="green">
-                  {game.gameName} - 第 {game.currentDay}/{game.totalDays} 天
-                </Tag>
-              )}
-              {gameDay && (
-                <Tag color={getStatusColor(gameDay.status)}>
-                  {STATUS_DISPLAY_TEXT[gameDay.status] || gameDay.status}
-                </Tag>
+                <>
+                  <Tag color="green">
+                    {game.gameName} - 第 {game.currentDay}/{game.totalDays} 天
+                  </Tag>
+                  <Tag color={getStatusColor(game.phase)}>
+                    {STATUS_DISPLAY_TEXT[game.phase] || game.phase}
+                  </Tag>
+                </>
               )}
               <Button icon={<LogoutOutlined />} onClick={handleLogout}>
                 登出

@@ -50,18 +50,18 @@ export default function BidsPage() {
           const dayResponse = await api.getCurrentGameDay(gameData.id)
           if (dayResponse.data) {
             setCurrentDay(dayResponse.data)
-            // 根據當前狀態設定預設的投標類型
-            // buying_open, buying_closed → 買入
-            // selling_open, selling_closed, settled → 賣出
-            const dayStatus = dayResponse.data.status
-            if (['selling_open', 'selling_closed', 'settled'].includes(dayStatus)) {
-              setSelectedBidType('sell')
-            } else {
-              setSelectedBidType('buy')
-            }
           }
         } catch (e) {
-          // 如果獲取失敗，預設使用買入
+          // 忽略錯誤
+        }
+
+        // 根據當前階段設定預設的投標類型（使用 game.phase）
+        // buying_open, buying_closed → 買入
+        // selling_open, selling_closed, settled → 賣出
+        const gamePhase = gameData.phase
+        if (['selling_open', 'selling_closed', 'settled'].includes(gamePhase)) {
+          setSelectedBidType('sell')
+        } else {
           setSelectedBidType('buy')
         }
 

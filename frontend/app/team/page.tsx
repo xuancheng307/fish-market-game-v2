@@ -250,16 +250,16 @@ export default function TeamHomePage() {
     },
   ]
 
-  // 判斷當前可以投標的類型
-  const canBuy = gameDay?.status === DAY_STATUS.BUYING_OPEN
-  const canSell = gameDay?.status === DAY_STATUS.SELLING_OPEN
+  // 判斷當前可以投標的類型（使用 game.phase）
+  const canBuy = game?.phase === DAY_STATUS.BUYING_OPEN
+  const canSell = game?.phase === DAY_STATUS.SELLING_OPEN
   const canBid = canBuy || canSell
 
-  // 獲取階段提示文字
+  // 獲取階段提示文字（使用 game.phase）
   const getPhaseMessage = () => {
-    if (!gameDay) return null
+    if (!game) return null
 
-    switch (gameDay.status) {
+    switch (game.phase) {
       case DAY_STATUS.PENDING:
         return { type: 'info' as const, message: '等待買入階段開始...' }
       case DAY_STATUS.BUYING_OPEN:

@@ -16,6 +16,7 @@ export interface Game {
   gameName: string
   description: string
   status: 'pending' | 'active' | 'paused' | 'finished' | 'force_ended'
+  phase: 'pending' | 'buying_open' | 'buying_closed' | 'selling_open' | 'selling_closed' | 'settled'  // 遊戲階段
   totalDays: number
   currentDay: number
   numTeams: number
@@ -50,7 +51,7 @@ export interface GameDay {
   id: number
   gameId: number
   dayNumber: number
-  status: 'pending' | 'buying_open' | 'buying_closed' | 'selling_open' | 'selling_closed' | 'settled'
+  // ⚠️ status 已移到 Game.phase
   fishASupply: number
   fishARestaurantBudget: number
   fishBSupply: number

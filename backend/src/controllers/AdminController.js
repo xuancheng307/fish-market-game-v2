@@ -65,12 +65,12 @@ class AdminController {
      * POST /api/admin/games/:id/start-buying - 開始買入投標
      */
     static startBuying = asyncHandler(async (req, res) => {
-        const gameDay = await GameService.startBuying(req.params.id, req.body);
+        const game = await GameService.startBuying(req.params.id, req.body);
 
         res.json({
             success: true,
             message: '買入投標已開始',
-            data: gameDayToApi(gameDay)  // ⚠️ 轉換為 camelCase
+            data: gameToApi(game)  // ⚠️ 返回 game (含 phase)
         });
     });
 
@@ -84,7 +84,7 @@ class AdminController {
             success: true,
             message: '買入投標已關閉，結算完成',
             data: {
-                gameDay: gameDayToApi(result.gameDay),
+                game: gameToApi(result.game),  // ⚠️ 返回 game (含 phase)
                 settlementResults: result.settlementResults
             }
         });
@@ -94,12 +94,12 @@ class AdminController {
      * POST /api/admin/games/:id/start-selling - 開始賣出投標
      */
     static startSelling = asyncHandler(async (req, res) => {
-        const gameDay = await GameService.startSelling(req.params.id, req.body);
+        const game = await GameService.startSelling(req.params.id, req.body);
 
         res.json({
             success: true,
             message: '賣出投標已開始',
-            data: gameDayToApi(gameDay)
+            data: gameToApi(game)  // ⚠️ 返回 game (含 phase)
         });
     });
 
@@ -113,7 +113,7 @@ class AdminController {
             success: true,
             message: '賣出投標已關閉，結算完成',
             data: {
-                gameDay: gameDayToApi(result.gameDay),
+                game: gameToApi(result.game),  // ⚠️ 返回 game (含 phase)
                 settlementResults: result.settlementResults
             }
         });
@@ -129,7 +129,7 @@ class AdminController {
             success: true,
             message: '每日結算完成',
             data: {
-                gameDay: gameDayToApi(result.gameDay),
+                game: gameToApi(result.game),  // ⚠️ 返回 game (含 phase)
                 settlementResults: result.settlementResults
             }
         });
@@ -155,8 +155,7 @@ class AdminController {
                 success: true,
                 message: `已推進到第 ${result.game.current_day} 天`,
                 data: {
-                    game: gameToApi(result.game),
-                    gameDay: gameDayToApi(result.gameDay),
+                    game: gameToApi(result.game),  // ⚠️ game 已包含 phase
                     finished: false
                 }
             });

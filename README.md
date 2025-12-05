@@ -7,19 +7,19 @@
 這是魚市場遊戲的完全重構版本，解決了原版本的系統性問題：
 - ✅ 統一命名規範 (資料庫 snake_case，API camelCase)
 - ✅ 完全參數化 (所有遊戲參數可調整)
-- ✅ 單一狀態源 (使用 game_days.status，移除 games.phase)
+- ✅ 單一狀態源 (使用 games.phase 管理階段狀態)
 - ✅ 清晰的商業邏輯 (借貸、結算、利息計算)
 
 ## 核心商業邏輯
 
 ### 借貸邏輯
 - 借貸發生在**投標時** (不是結算時)
-- 借貸時現金增加: `currentBudget += loanNeeded`
+- 借貸時現金增加: `cash += loanNeeded`
 - 無退款機制: 借的錢持續計息直到遊戲結束
 
 ### 結算邏輯
 - 現金扣除發生在**結算時**
-- 只扣除成交數量的金額: `currentBudget -= price × fulfilledQty`
+- 只扣除成交數量的金額: `cash -= price × fulfilledQty`
 - 優先順序: 買入按價格降序、賣出按價格升序，相同價格早提交優先
 
 ### 滯銷處理
@@ -125,7 +125,7 @@ npm start
 ```javascript
 const dbRow = {
     game_id: 1,
-    current_budget: 100000,
+    cash: 100000,
     fish_a_inventory: 500
 };
 ```
@@ -134,7 +134,7 @@ const dbRow = {
 ```javascript
 const apiData = {
     gameId: 1,
-    currentBudget: 100000,
+    cash: 100000,
     fishAInventory: 500
 };
 ```
@@ -167,20 +167,17 @@ throw new AppError(
 
 ### 狀態管理
 
-使用 game_days.status 作為唯一狀態：
+使用 games.phase 作為唯一階段狀態：
 ```javascript
 const { DAY_STATUS } = require('./config/constants');
 
-// 檢查狀態
-if (currentDay.status !== DAY_STATUS.BUYING_OPEN) {
+// 檢查階段
+if (game.phase !== DAY_STATUS.BUYING_OPEN) {
     throw new AppError('當前不在買入投標階段', ERROR_CODES.INVALID_PHASE, 400);
 }
 
-// 更新狀態
-await db.query(
-    'UPDATE game_days SET status = ? WHERE id = ?',
-    [DAY_STATUS.BUYING_CLOSED, currentDay.id]
-);
+// 更新階段
+await Game.updatePhase(gameId, DAY_STATUS.BUYING_CLOSED);
 ```
 
 ## 測試

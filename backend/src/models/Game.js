@@ -144,6 +144,18 @@ class Game {
     }
 
     /**
+     * 更新遊戲階段 (phase)
+     * ⚠️ 這是唯一的階段狀態來源！
+     */
+    static async updatePhase(id, phase) {
+        await query(
+            'UPDATE games SET phase = ? WHERE id = ?',
+            [phase, id]
+        );
+        return await this.findById(id);
+    }
+
+    /**
      * 更新遊戲狀態
      */
     static async updateStatus(id, status) {

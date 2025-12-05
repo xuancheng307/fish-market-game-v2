@@ -29,12 +29,12 @@ class BidService {
             throw new AppError('找不到遊戲天數', ERROR_CODES.GAME_NOT_FOUND, 404);
         }
 
-        // 2. 檢查當前階段是否允許投標
-        if (bidType === BID_TYPE.BUY && gameDay.status !== DAY_STATUS.BUYING_OPEN) {
+        // 2. 檢查當前階段是否允許投標（使用 game.phase）
+        if (bidType === BID_TYPE.BUY && game.phase !== DAY_STATUS.BUYING_OPEN) {
             throw new AppError('當前不在買入投標階段', ERROR_CODES.INVALID_PHASE, 400);
         }
 
-        if (bidType === BID_TYPE.SELL && gameDay.status !== DAY_STATUS.SELLING_OPEN) {
+        if (bidType === BID_TYPE.SELL && game.phase !== DAY_STATUS.SELLING_OPEN) {
             throw new AppError('當前不在賣出投標階段', ERROR_CODES.INVALID_PHASE, 400);
         }
 

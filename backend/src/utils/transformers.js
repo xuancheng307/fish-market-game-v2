@@ -77,6 +77,7 @@ function gameToApi(dbRow) {
         gameName: dbRow.name,
         description: dbRow.description,
         status: dbRow.status,
+        phase: dbRow.phase,  // 遊戲階段 (pending/buying_open/buying_closed/selling_open/selling_closed/settled)
 
         totalDays: dbRow.total_days,
         currentDay: dbRow.current_day,
@@ -119,6 +120,7 @@ function gameToApi(dbRow) {
 
 /**
  * 每日資料 (game_days 表) 轉換為 API 格式
+ * ⚠️ 注意: phase 已移到 games 表，此函數不再回傳 status
  */
 function gameDayToApi(dbRow) {
     if (!dbRow) return null;
@@ -127,7 +129,6 @@ function gameDayToApi(dbRow) {
         id: dbRow.id,
         gameId: dbRow.game_id,
         dayNumber: dbRow.day_number,
-        status: dbRow.status,
 
         fishASupply: dbRow.fish_a_supply,
         fishARestaurantBudget: parseFloat(dbRow.fish_a_restaurant_budget),

@@ -108,7 +108,7 @@ export default function GameControlPage() {
 
     // 監聽 WebSocket 更新
     wsClient.onPhaseChange((data) => {
-      message.info(`階段已變更：${STATUS_DISPLAY_TEXT[data.status] || data.status}`)
+      message.info(`階段已變更：${STATUS_DISPLAY_TEXT[data.phase] || data.phase}`)
       loadGameData()
     })
 
@@ -318,9 +318,9 @@ export default function GameControlPage() {
     }
   }
 
-  // 獲取可用操作按鈕
+  // 獲取可用操作按鈕（使用 game.phase）
   const getAvailableActions = () => {
-    if (!gameDay) return []
+    if (!game) return []
 
     const actionsMap: Record<string, { label: string; action: string; icon: any }> = {
       [DAY_STATUS.PENDING]: { label: '開始買入投標', action: 'startBuying', icon: <PlayCircleOutlined /> },
@@ -331,18 +331,18 @@ export default function GameControlPage() {
       [DAY_STATUS.SETTLED]: { label: '進入次日', action: 'nextDay', icon: <RightCircleOutlined /> },
     }
 
-    return actionsMap[gameDay.status] ? [actionsMap[gameDay.status]] : []
+    return actionsMap[game.phase] ? [actionsMap[game.phase]] : []
   }
 
-  // 計算投標進度
+  // 計算投標進度（使用 game.phase）
   const getBiddingProgress = () => {
-    if (!gameDay || !teams.length) return null
+    if (!game || !teams.length) return null
 
     // 只在買入或賣出階段顯示進度
-    const isBiddingPhase = gameDay.status === DAY_STATUS.BUYING_OPEN || gameDay.status === DAY_STATUS.SELLING_OPEN
+    const isBiddingPhase = game.phase === DAY_STATUS.BUYING_OPEN || game.phase === DAY_STATUS.SELLING_OPEN
     if (!isBiddingPhase) return null
 
-    const currentPhase = gameDay.status === DAY_STATUS.BUYING_OPEN ? 'buy' : 'sell'
+    const currentPhase = game.phase === DAY_STATUS.BUYING_OPEN ? 'buy' : 'sell'
 
     // 篩選出當前階段的投標
     const currentPhaseBids = allBids.filter(bid => bid.bidType === currentPhase)
@@ -517,11 +517,11 @@ export default function GameControlPage() {
               </Space>
             }
           >
-            {gameDay && (
+            {game && (
               <div>
                 <div style={{ marginBottom: 24 }}>
-                  <Tag color={getStatusColor(gameDay.status)} style={{ fontSize: 16, padding: '8px 16px' }}>
-                    {STATUS_DISPLAY_TEXT[gameDay.status] || gameDay.status}
+                  <Tag color={getStatusColor(game.phase)} style={{ fontSize: 16, padding: '8px 16px' }}>
+                    {STATUS_DISPLAY_TEXT[game.phase] || game.phase}
                   </Tag>
                 </div>
 
@@ -540,7 +540,7 @@ export default function GameControlPage() {
                   ))}
                 </Space>
 
-                {game.status === 'active' && gameDay.status === DAY_STATUS.SETTLED && game.currentDay >= game.totalDays && (
+                {game.status === 'active' && game.phase === DAY_STATUS.SETTLED && game.currentDay >= game.totalDays && (
                   <Alert
                     message="遊戲已完成"
                     description="所有天數已執行完畢，可以查看最終結果或強制結束遊戲"

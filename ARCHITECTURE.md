@@ -19,7 +19,7 @@
 
 - ✅ **統一命名規範**: 資料庫 snake_case，API/前端 camelCase，明確轉換層
 - ✅ **完全參數化**: 所有遊戲參數可調整，存儲於 games 表
-- ✅ **單一狀態源**: 使用 game_days.status 作為唯一狀態，移除 games.phase
+- ✅ **單一狀態源**: 使用 games.phase 作為唯一階段狀態
 - ✅ **統一 API 格式**: 所有 API 返回 camelCase
 - ✅ **清晰的商業邏輯**: 借貸、結算、利息計算邏輯明確且正確
 
@@ -40,7 +40,7 @@ async function submitBuyBid(teamId, fishType, price, quantity) {
     // 1. 計算可用資金
     const maxLoan = team.initialBudget * team.maxLoanRatio;
     const remainingLoanCapacity = maxLoan - team.totalLoan;
-    const availableFunds = team.currentBudget + remainingLoanCapacity;
+    const availableFunds = team.cash + remainingLoanCapacity;
 
     // 2. 檢查資金是否足夠
     if (bidAmount > availableFunds) {
@@ -48,11 +48,11 @@ async function submitBuyBid(teamId, fishType, price, quantity) {
     }
 
     // 3. 如果需要借貸 (關鍵: 現金會增加!)
-    if (bidAmount > team.currentBudget) {
-        const loanNeeded = bidAmount - team.currentBudget;
+    if (bidAmount > team.cash) {
+        const loanNeeded = bidAmount - team.cash;
         team.totalLoan += loanNeeded;
         team.totalLoanPrincipal += loanNeeded;
-        team.currentBudget += loanNeeded;  // ← 現金增加!
+        team.cash += loanNeeded;  // ← 現金增加!
     }
 
     // 4. 此時不扣除現金，只保存借貸記錄
@@ -71,7 +71,7 @@ async function submitBuyBid(teamId, fishType, price, quantity) {
 
 **關鍵點**:
 - ✅ 借貸時機: 提交投標時
-- ✅ 現金變化: `currentBudget += loanNeeded` (增加!)
+- ✅ 現金變化: `cash += loanNeeded` (增加!)
 - ✅ 此時不扣除現金，只是確保有錢可以下單
 - ✅ 借的錢即使沒用到也不退款，會持續計息
 
@@ -110,7 +110,7 @@ async function settleBuyingPhase(gameId, dayNumber) {
         if (fulfilledQty > 0) {
             // 4. 扣除現金 (只扣除成交部分!)
             const transactionAmount = bid.price * fulfilledQty;
-            team.currentBudget -= transactionAmount;
+            team.cash -= transactionAmount;
 
             // 5. 增加庫存
             if (bid.fishType === 'A') {
@@ -178,7 +178,7 @@ async function settleSellingPhase(gameId, dayNumber) {
             // 處理滯銷部分
             const team = await getTeam(bid.teamId);
             const unsoldFee = bid.markedAsUnsold * team.unsoldFeePerKg;
-            team.currentBudget -= unsoldFee;
+            team.cash -= unsoldFee;
 
             // 減少庫存
             if (bid.fishType === 'A') {
@@ -199,7 +199,7 @@ async function settleSellingPhase(gameId, dayNumber) {
 
             // 4. 增加現金
             const revenue = bid.price * fulfilledQty;
-            team.currentBudget += revenue;
+            team.cash += revenue;
 
             // 5. 減少庫存
             if (bid.fishType === 'A') {
@@ -225,7 +225,7 @@ async function settleSellingPhase(gameId, dayNumber) {
 - ✅ 優先順序: 價格低優先，相同價格早提交優先
 - ✅ 固定滯銷: 最高價的 2.5% 自動滯銷
 - ✅ 滯銷費用: `unsoldQuantity × unsoldFeePerKg`
-- ✅ 現金增加: `currentBudget += revenue`
+- ✅ 現金增加: `cash += revenue`
 
 ### 2.4 每日結算 (利息與ROI)
 
@@ -243,7 +243,7 @@ async function dailySettlement(gameId, dayNumber) {
         team.totalLoan += dailyInterest;
 
         // 3. 從現金扣除利息
-        team.currentBudget -= dailyInterest;
+        team.cash -= dailyInterest;
 
         // 4. 計算當日損益
         const dayProfit = calculateDayProfit(team, dayNumber);
@@ -265,7 +265,7 @@ async function dailySettlement(gameId, dayNumber) {
             cost: team.dailyCost,
             profit: dayProfit,
             interestPaid: dailyInterest,
-            currentBudget: team.currentBudget,
+            cash: team.cash,
             totalLoan: team.totalLoan,
             roi: team.roi
         });
@@ -284,8 +284,8 @@ async function dailySettlement(gameId, dayNumber) {
 
 ### 3.1 設計原則
 
-1. **單一狀態源**: 使用 `game_days.status` 作為唯一狀態標識
-2. **移除冗餘**: 移除 `games.phase` 欄位
+1. **單一狀態源**: 使用 `games.phase` 作為唯一階段狀態
+2. **games.status**: 管理遊戲整體狀態（active/paused/finished）
 3. **完整參數化**: 所有遊戲參數存儲於 `games` 表
 4. **清晰關聯**: 明確的外鍵關係
 
@@ -299,7 +299,8 @@ CREATE TABLE games (
     description TEXT,
     status ENUM('pending', 'active', 'paused', 'finished', 'force_ended') DEFAULT 'pending',
 
-    -- 移除 phase 欄位! 狀態由 game_days.status 管理
+    -- 階段狀態 (唯一狀態源)
+    phase ENUM('pending', 'buying_open', 'buying_closed', 'selling_open', 'selling_closed', 'settled') DEFAULT 'pending',
 
     -- 基本設定
     total_days INT NOT NULL DEFAULT 10,
@@ -340,22 +341,14 @@ CREATE TABLE games (
 );
 ```
 
-#### game_days 表 (每日資料與狀態)
+#### game_days 表 (每日資料)
 ```sql
 CREATE TABLE game_days (
     id INT PRIMARY KEY AUTO_INCREMENT,
     game_id INT NOT NULL,
     day_number INT NOT NULL,
 
-    -- 唯一狀態欄位
-    status ENUM(
-        'pending',          -- 等待開始
-        'buying_open',      -- 買入投標中
-        'buying_closed',    -- 買入已關閉(結算中)
-        'selling_open',     -- 賣出投標中
-        'selling_closed',   -- 賣出已關閉(結算中)
-        'settled'           -- 已完成每日結算
-    ) DEFAULT 'pending',
+    -- 注意: 狀態已移至 games.phase，此表只存每日參數
 
     -- 每日供給與需求 (A魚)
     fish_a_supply INT NOT NULL DEFAULT 0,
@@ -369,8 +362,7 @@ CREATE TABLE game_days (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 
     FOREIGN KEY (game_id) REFERENCES games(id) ON DELETE CASCADE,
-    UNIQUE KEY unique_game_day (game_id, day_number),
-    INDEX idx_status (status)
+    UNIQUE KEY unique_game_day (game_id, day_number)
 );
 ```
 
@@ -383,7 +375,7 @@ CREATE TABLE game_participants (
     team_name VARCHAR(100) NOT NULL,
 
     -- 財務狀態
-    current_budget DECIMAL(12, 2) NOT NULL,
+    cash DECIMAL(12, 2) NOT NULL,
     initial_budget DECIMAL(12, 2) NOT NULL,
     total_loan DECIMAL(12, 2) DEFAULT 0.00,
     total_loan_principal DECIMAL(12, 2) DEFAULT 0.00,
@@ -453,7 +445,7 @@ CREATE TABLE daily_results (
     unsold_fee DECIMAL(12, 2) DEFAULT 0.00,
 
     -- 當日結束時狀態
-    current_budget DECIMAL(12, 2) NOT NULL,
+    cash DECIMAL(12, 2) NOT NULL,
     total_loan DECIMAL(12, 2) NOT NULL,
     fish_a_inventory INT DEFAULT 0,
     fish_b_inventory INT DEFAULT 0,
@@ -491,7 +483,7 @@ CREATE TABLE users (
 
 ### 3.3 關鍵設計決策
 
-1. **移除 games.phase**: 簡化狀態管理，使用 game_days.status 作為單一真相來源
+1. **games.phase 為唯一階段狀態**: 簡化狀態管理，game_days 只存每日參數
 2. **bids 表包含 game_id**: 方便查詢和級聯刪除
 3. **分離 A/B 魚**: fish_a_* 和 fish_b_* 欄位分開，邏輯清晰
 4. **完整參數化**: 所有遊戲規則參數都存儲在 games 表
@@ -507,35 +499,35 @@ CREATE TABLE users (
 創建遊戲
   ↓
 games.status = 'active'
-game_days.status = 'pending' (第1天)
+games.phase = 'pending' (第1天)
   ↓
 開始買入投標
   ↓
-game_days.status = 'buying_open'
+games.phase = 'buying_open'
   ↓
 關閉買入投標 + 買入結算
   ↓
-game_days.status = 'buying_closed'
+games.phase = 'buying_closed'
 [執行 settleBuyingPhase()]
   ↓
 開始賣出投標
   ↓
-game_days.status = 'selling_open'
+games.phase = 'selling_open'
   ↓
 關閉賣出投標 + 賣出結算
   ↓
-game_days.status = 'selling_closed'
+games.phase = 'selling_closed'
 [執行 settleSellingPhase()]
   ↓
 執行每日結算
   ↓
-game_days.status = 'settled'
+games.phase = 'settled'
 [執行 dailySettlement()]
   ↓
 推進到下一天
   ↓
 games.current_day++
-創建新的 game_days (status = 'pending')
+games.phase = 'pending'
   ↓
 如果 current_day > total_days
   ↓
@@ -547,7 +539,7 @@ games.status = 'finished'
 前端需要顯示友善的狀態文字，透過映射函數轉換：
 
 ```javascript
-function getPhaseDisplayText(gameDayStatus) {
+function getPhaseDisplayText(gamePhase) {
     const mapping = {
         'pending': '等待開始',
         'buying_open': '買入投標中',
@@ -556,10 +548,10 @@ function getPhaseDisplayText(gameDayStatus) {
         'selling_closed': '賣出已關閉',
         'settled': '結算完成'
     };
-    return mapping[gameDayStatus] || '未知狀態';
+    return mapping[gamePhase] || '未知狀態';
 }
 
-function getAvailableActions(gameDayStatus) {
+function getAvailableActions(gamePhase) {
     const actions = {
         'pending': ['startBuying'],
         'buying_open': ['closeBuying'],
@@ -568,7 +560,7 @@ function getAvailableActions(gameDayStatus) {
         'selling_closed': ['settle'],
         'settled': ['nextDay']
     };
-    return actions[gameDayStatus] || [];
+    return actions[gamePhase] || [];
 }
 ```
 
@@ -600,13 +592,12 @@ function dbToApi(dbRow) {
     };
 }
 
-// game_days 轉換
+// game_days 轉換 (不含 status，狀態在 games.phase)
 function gameDayToApi(dbRow) {
     return {
         id: dbRow.id,
         gameId: dbRow.game_id,
         dayNumber: dbRow.day_number,
-        status: dbRow.status,
         fishASupply: dbRow.fish_a_supply,
         fishARestaurantBudget: dbRow.fish_a_restaurant_budget,
         fishBSupply: dbRow.fish_b_supply,
@@ -622,7 +613,7 @@ function teamToApi(dbRow) {
         gameId: dbRow.game_id,
         userId: dbRow.user_id,
         teamName: dbRow.team_name,
-        currentBudget: dbRow.current_budget,
+        cash: dbRow.cash,
         initialBudget: dbRow.initial_budget,
         totalLoan: dbRow.total_loan,
         totalLoanPrincipal: dbRow.total_loan_principal,
@@ -660,9 +651,9 @@ function teamToApi(dbRow) {
     "data": {
         "gameId": 1,
         "gameName": "測試遊戲",
-        "gameStatus": "active",
-        "currentDay": 1,
-        "dayStatus": "pending"
+        "status": "active",
+        "phase": "pending",
+        "currentDay": 1
     }
 }
 ```
@@ -674,11 +665,9 @@ function teamToApi(dbRow) {
     "success": true,
     "message": "買入投標已開始",
     "data": {
-        "gameId": 1,
-        "currentDay": 1,
-        "dayStatus": "buying_open",
-        "fishASupply": 1000,
-        "fishBSupply": 800
+        "id": 1,
+        "phase": "buying_open",
+        "currentDay": 1
     }
 }
 ```
@@ -690,20 +679,12 @@ function teamToApi(dbRow) {
     "success": true,
     "message": "買入投標已關閉，結算完成",
     "data": {
-        "gameId": 1,
-        "currentDay": 1,
-        "dayStatus": "buying_closed",
-        "settlementResults": [
-            {
-                "teamId": 1,
-                "teamName": "A組",
-                "totalBidAmount": 50000,
-                "fulfilledAmount": 45000,
-                "fishAPurchased": 500,
-                "fishBPurchased": 400,
-                "cashAfter": 55000
-            }
-        ]
+        "game": {
+            "id": 1,
+            "phase": "buying_closed",
+            "currentDay": 1
+        },
+        "settlementResults": { ... }
     }
 }
 ```
@@ -715,11 +696,9 @@ function teamToApi(dbRow) {
     "success": true,
     "message": "賣出投標已開始",
     "data": {
-        "gameId": 1,
-        "currentDay": 1,
-        "dayStatus": "selling_open",
-        "fishARestaurantBudget": 80000,
-        "fishBRestaurantBudget": 60000
+        "id": 1,
+        "phase": "selling_open",
+        "currentDay": 1
     }
 }
 ```
@@ -731,18 +710,12 @@ function teamToApi(dbRow) {
     "success": true,
     "message": "賣出投標已關閉，結算完成",
     "data": {
-        "gameId": 1,
-        "currentDay": 1,
-        "dayStatus": "selling_closed",
-        "settlementResults": [
-            {
-                "teamId": 1,
-                "teamName": "A組",
-                "revenue": 60000,
-                "unsoldFee": 250,
-                "cashAfter": 114750
-            }
-        ]
+        "game": {
+            "id": 1,
+            "phase": "selling_closed",
+            "currentDay": 1
+        },
+        "settlementResults": { ... }
     }
 }
 ```
@@ -754,21 +727,12 @@ function teamToApi(dbRow) {
     "success": true,
     "message": "每日結算完成",
     "data": {
-        "gameId": 1,
-        "currentDay": 1,
-        "dayStatus": "settled",
-        "teamResults": [
-            {
-                "teamId": 1,
-                "teamName": "A組",
-                "dayProfit": 14500,
-                "interestPaid": 250,
-                "cumulativeProfit": 14500,
-                "roi": 14.5,
-                "currentBudget": 114500,
-                "totalLoan": 8500
-            }
-        ]
+        "game": {
+            "id": 1,
+            "phase": "settled",
+            "currentDay": 1
+        },
+        "settlementResults": { ... }
     }
 }
 ```
@@ -780,9 +744,12 @@ function teamToApi(dbRow) {
     "success": true,
     "message": "已推進到第2天",
     "data": {
-        "gameId": 1,
-        "currentDay": 2,
-        "dayStatus": "pending"
+        "game": {
+            "id": 1,
+            "phase": "pending",
+            "currentDay": 2
+        },
+        "finished": false
     }
 }
 ```
@@ -796,14 +763,14 @@ function teamToApi(dbRow) {
         "game": {
             "id": 1,
             "gameName": "測試遊戲",
-            "gameStatus": "active",
+            "status": "active",
+            "phase": "pending",
             "currentDay": 1,
-            "totalDays": 10,
-            "numTeams": 6
+            "totalDays": 10
         },
-        "currentDayData": {
+        "currentDay": {
+            "id": 1,
             "dayNumber": 1,
-            "status": "pending",
             "fishASupply": 1000,
             "fishBSupply": 800,
             "fishARestaurantBudget": 80000,
@@ -813,7 +780,7 @@ function teamToApi(dbRow) {
             {
                 "id": 1,
                 "teamName": "A組",
-                "currentBudget": 100000,
+                "cash": 100000,
                 "totalLoan": 0,
                 "fishAInventory": 0,
                 "fishBInventory": 0,
@@ -865,7 +832,7 @@ function teamToApi(dbRow) {
         "team": {
             "id": 1,
             "teamName": "A組",
-            "currentBudget": 105000,
+            "cash": 105000,
             "totalLoan": 5000,
             "totalLoanPrincipal": 5000,
             "fishAInventory": 0,
@@ -873,15 +840,19 @@ function teamToApi(dbRow) {
             "cumulativeProfit": 0,
             "roi": 0
         },
+        "game": {
+            "id": 1,
+            "phase": "buying_open",
+            "currentDay": 1
+        },
         "currentDay": {
             "dayNumber": 1,
-            "status": "buying_open",
             "fishASupply": 1000,
             "fishBSupply": 800
         },
         "myBids": [
             {
-                "bidId": 1,
+                "id": 1,
                 "fishType": "A",
                 "bidType": "buy",
                 "price": 90,
@@ -1111,8 +1082,8 @@ function teamToApi(dbRow) {
 - [ ] 前端使用 camelCase 存取資料
 
 **狀態管理**:
-- [ ] 移除所有 games.phase 相關代碼
-- [ ] 使用 game_days.status 作為唯一狀態
+- [ ] 使用 games.phase 作為唯一階段狀態
+- [ ] game_days 表只存每日參數（供給、預算）
 - [ ] 狀態轉換邏輯正確
 - [ ] WebSocket 更新正確
 
@@ -1157,7 +1128,7 @@ function teamToApi(dbRow) {
 這份架構文件記錄了魚市場遊戲重構的完整設計，核心目標是解決舊版本的系統性問題：
 
 1. **統一命名**: 資料庫 snake_case，API camelCase，明確轉換
-2. **單一狀態**: 移除 games.phase，使用 game_days.status
+2. **單一狀態**: 使用 games.phase 管理階段狀態
 3. **正確邏輯**: 借貸在投標時、現金在結算時扣除、無退款
 4. **完全參數化**: 所有遊戲參數可調整
 5. **清晰結構**: 分層架構，職責明確
@@ -1165,7 +1136,7 @@ function teamToApi(dbRow) {
 **開始開發前請確認**:
 - ✅ 理解借貸邏輯 (投標時借貸，現金增加)
 - ✅ 理解結算邏輯 (結算時扣除，無退款)
-- ✅ 理解狀態管理 (game_days.status 唯一狀態)
+- ✅ 理解狀態管理 (games.phase 唯一階段狀態)
 - ✅ 理解命名轉換 (transformers 函數)
 
 讓我們開始建立一個乾淨、可維護的系統！

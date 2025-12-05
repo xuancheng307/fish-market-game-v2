@@ -2,11 +2,10 @@
  * GameDay Model - 每日資料模型
  * 返回 snake_case 格式
  *
- * ⚠️ 注意: status 是唯一狀態來源！
+ * ⚠️ 注意: phase 已移到 games 表！此表只存每日參數（供給量、預算）
  */
 
 const { query } = require('../config/database');
-const { DAY_STATUS } = require('../config/constants');
 
 class GameDay {
     /**
@@ -43,12 +42,12 @@ class GameDay {
 
     /**
      * 創建新的一天
+     * ⚠️ 注意: 不再存 status，phase 由 games 表管理
      */
     static async create(gameDayData) {
         const {
             game_id,
             day_number,
-            status = DAY_STATUS.PENDING,
             fish_a_supply = 0,
             fish_a_restaurant_budget = 0,
             fish_b_supply = 0,
@@ -57,29 +56,18 @@ class GameDay {
 
         const result = await query(
             `INSERT INTO game_days (
-                game_id, day_number, status,
+                game_id, day_number,
                 fish_a_supply, fish_a_restaurant_budget,
                 fish_b_supply, fish_b_restaurant_budget
-            ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            ) VALUES (?, ?, ?, ?, ?, ?)`,
             [
-                game_id, day_number, status,
+                game_id, day_number,
                 fish_a_supply, fish_a_restaurant_budget,
                 fish_b_supply, fish_b_restaurant_budget
             ]
         );
 
         return await this.findById(result.insertId);
-    }
-
-    /**
-     * 更新狀態 (唯一狀態來源!)
-     */
-    static async updateStatus(id, status) {
-        await query(
-            'UPDATE game_days SET status = ? WHERE id = ?',
-            [status, id]
-        );
-        return await this.findById(id);
     }
 
     /**
