@@ -85,12 +85,17 @@ class SettlementService {
             fish_type: fishType
         });
 
+        // 調試日誌
+        const totalBidQty = bids.reduce((sum, b) => sum + b.quantity_submitted, 0);
+        console.log(`[買入結算] ${fishType}魚: 投標筆數=${bids.length}, 總投標量=${totalBidQty}`);
+
         if (bids.length === 0) {
             return { totalFulfilled: 0, totalCost: 0, remainingSupply: 0 };
         }
 
         // 2. 取得供給量（買入無滯銷！）
         const supply = fishType === FISH_TYPE.A ? gameDay.fish_a_supply : gameDay.fish_b_supply;
+        console.log(`[買入結算] ${fishType}魚: 供給量=${supply}`);
         let remainingSupply = supply;
 
         let totalFulfilled = 0;
@@ -135,6 +140,8 @@ class SettlementService {
 
             if (remainingSupply <= 0) break;
         }
+
+        console.log(`[買入結算] ${fishType}魚: 總成交量=${totalFulfilled}, 剩餘供給=${remainingSupply}`);
 
         return {
             totalFulfilled,
