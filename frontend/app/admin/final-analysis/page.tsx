@@ -66,14 +66,14 @@ export default function FinalAnalysisPage() {
   const getFinalRankings = () => {
     if (!game) return []
     const finalDayResults = allDailyResults.filter(r => r.dayNumber === game.totalDays)
-    return finalDayResults.sort((a, b) => b.roi - a.roi)
+    return finalDayResults.sort((a, b) => (b.roi || 0) - (a.roi || 0))
   }
 
   // 獲取某個團隊的所有天數數據
   const getTeamDailyData = (teamNumber: number) => {
     return allDailyResults
       .filter(r => r.teamNumber === teamNumber)
-      .sort((a, b) => a.dayNumber - b.dayNumber)
+      .sort((a, b) => (a.dayNumber || 0) - (b.dayNumber || 0))
   }
 
   // 獲取所有獨特的團隊編號
@@ -92,11 +92,11 @@ export default function FinalAnalysisPage() {
     const series = teamNumbers.map(teamNumber => {
       const teamData = getTeamDailyData(teamNumber)
       return {
-        name: `第${teamNumber}隊`,
+        name: `第${teamNumber || '?'}隊`,
         type: 'line',
         data: days.map(day => {
           const dayResult = teamData.find(r => r.dayNumber === day)
-          return dayResult ? dayResult.roi * 100 : null
+          return dayResult ? (dayResult.roi || 0) * 100 : null
         }),
         smooth: true,
       }
@@ -110,17 +110,17 @@ export default function FinalAnalysisPage() {
       tooltip: {
         trigger: 'axis',
         formatter: (params: any) => {
-          let result = `第 ${params[0].name} 天<br/>`
+          let result = `第 ${params[0]?.name || '?'} 天<br/>`
           params.forEach((param: any) => {
-            if (param.value !== null) {
-              result += `${param.seriesName}: ${param.value.toFixed(2)}%<br/>`
+            if (param.value !== null && param.value !== undefined) {
+              result += `${param.seriesName}: ${(param.value || 0).toFixed(2)}%<br/>`
             }
           })
           return result
         },
       },
       legend: {
-        data: teamNumbers.map(n => `第${n}隊`),
+        data: teamNumbers.map(n => `第${n || '?'}隊`),
         top: 30,
       },
       grid: {
@@ -138,7 +138,7 @@ export default function FinalAnalysisPage() {
         type: 'value',
         name: 'ROI (%)',
         axisLabel: {
-          formatter: (value: number) => value.toFixed(0) + '%',
+          formatter: (value: number) => (value || 0).toFixed(0) + '%',
         },
       },
       series,
@@ -155,11 +155,11 @@ export default function FinalAnalysisPage() {
     const series = teamNumbers.map(teamNumber => {
       const teamData = getTeamDailyData(teamNumber)
       return {
-        name: `第${teamNumber}隊`,
+        name: `第${teamNumber || '?'}隊`,
         type: 'line',
         data: days.map(day => {
           const dayResult = teamData.find(r => r.dayNumber === day)
-          return dayResult ? dayResult.cumulativeProfit : null
+          return dayResult ? (dayResult.cumulativeProfit || 0) : null
         }),
         smooth: true,
       }
@@ -173,17 +173,17 @@ export default function FinalAnalysisPage() {
       tooltip: {
         trigger: 'axis',
         formatter: (params: any) => {
-          let result = `第 ${params[0].name} 天<br/>`
+          let result = `第 ${params[0]?.name || '?'} 天<br/>`
           params.forEach((param: any) => {
-            if (param.value !== null) {
-              result += `${param.seriesName}: $${param.value.toLocaleString()}<br/>`
+            if (param.value !== null && param.value !== undefined) {
+              result += `${param.seriesName}: $${(param.value || 0).toLocaleString()}<br/>`
             }
           })
           return result
         },
       },
       legend: {
-        data: teamNumbers.map(n => `第${n}隊`),
+        data: teamNumbers.map(n => `第${n || '?'}隊`),
         top: 30,
       },
       grid: {
@@ -201,7 +201,7 @@ export default function FinalAnalysisPage() {
         type: 'value',
         name: '累積收益 ($)',
         axisLabel: {
-          formatter: (value: number) => '$' + (value / 1000).toFixed(0) + 'K',
+          formatter: (value: number) => '$' + ((value || 0) / 1000).toFixed(0) + 'K',
         },
       },
       series,
@@ -214,7 +214,7 @@ export default function FinalAnalysisPage() {
 
     const dayResults = allDailyResults
       .filter(r => r.dayNumber === selectedDay)
-      .sort((a, b) => b.roi - a.roi)
+      .sort((a, b) => (b.roi || 0) - (a.roi || 0))
 
     return {
       title: {
@@ -239,7 +239,7 @@ export default function FinalAnalysisPage() {
       },
       xAxis: {
         type: 'category',
-        data: dayResults.map(r => `第${r.teamNumber}隊`),
+        data: dayResults.map(r => `第${r.teamNumber || '?'}隊`),
         axisLabel: {
           rotate: 0,
         },
@@ -250,7 +250,7 @@ export default function FinalAnalysisPage() {
           name: 'ROI (%)',
           position: 'left',
           axisLabel: {
-            formatter: (value: number) => value + '%',
+            formatter: (value: number) => (value || 0) + '%',
           },
         },
         {
@@ -258,7 +258,7 @@ export default function FinalAnalysisPage() {
           name: '收益 ($)',
           position: 'right',
           axisLabel: {
-            formatter: (value: number) => '$' + (value / 1000).toFixed(0) + 'K',
+            formatter: (value: number) => '$' + ((value || 0) / 1000).toFixed(0) + 'K',
           },
         },
       ],
@@ -266,7 +266,7 @@ export default function FinalAnalysisPage() {
         {
           name: 'ROI',
           type: 'bar',
-          data: dayResults.map(r => (r.roi * 100).toFixed(2)),
+          data: dayResults.map(r => ((r.roi || 0) * 100).toFixed(2)),
           itemStyle: {
             color: '#1890ff',
           },
@@ -275,7 +275,7 @@ export default function FinalAnalysisPage() {
           name: '累積收益',
           type: 'bar',
           yAxisIndex: 1,
-          data: dayResults.map(r => r.cumulativeProfit),
+          data: dayResults.map(r => r.cumulativeProfit || 0),
           itemStyle: {
             color: '#52c41a',
           },
@@ -284,7 +284,7 @@ export default function FinalAnalysisPage() {
           name: '當日收益',
           type: 'bar',
           yAxisIndex: 1,
-          data: dayResults.map(r => r.dailyProfit),
+          data: dayResults.map(r => r.dailyProfit || 0),
           itemStyle: {
             color: '#faad14',
           },
@@ -319,7 +319,7 @@ export default function FinalAnalysisPage() {
       key: 'teamNumber',
       width: 100,
       fixed: 'left' as const,
-      render: (num: number) => <strong>第 {num} 隊</strong>,
+      render: (num: number) => <strong>第 {num || '?'} 隊</strong>,
     },
     {
       title: 'ROI',
@@ -327,9 +327,9 @@ export default function FinalAnalysisPage() {
       key: 'roi',
       width: 120,
       render: (roi: number) => (
-        <Tag color={roi > 0 ? 'success' : roi < 0 ? 'error' : 'default'} style={{ fontSize: 16 }}>
-          {roi > 0 ? <RiseOutlined /> : roi < 0 ? <FallOutlined /> : null}
-          {' '}{(roi * 100).toFixed(2)}%
+        <Tag color={(roi || 0) > 0 ? 'success' : (roi || 0) < 0 ? 'error' : 'default'} style={{ fontSize: 16 }}>
+          {(roi || 0) > 0 ? <RiseOutlined /> : (roi || 0) < 0 ? <FallOutlined /> : null}
+          {' '}{((roi || 0) * 100).toFixed(2)}%
         </Tag>
       ),
     },
@@ -340,11 +340,11 @@ export default function FinalAnalysisPage() {
       width: 140,
       render: (profit: number) => (
         <span style={{
-          color: profit > 0 ? '#52c41a' : profit < 0 ? '#ff4d4f' : '#000',
+          color: (profit || 0) > 0 ? '#52c41a' : (profit || 0) < 0 ? '#ff4d4f' : '#000',
           fontWeight: 'bold',
           fontSize: 16,
         }}>
-          ${profit.toLocaleString()}
+          ${(profit || 0).toLocaleString()}
         </span>
       ),
     },
@@ -353,49 +353,49 @@ export default function FinalAnalysisPage() {
       dataIndex: 'dayEndCash',
       key: 'dayEndCash',
       width: 140,
-      render: (cash: number) => `$${cash.toLocaleString()}`,
+      render: (cash: number) => cash != null ? `$${cash.toLocaleString()}` : '-',
     },
     {
       title: '總收入',
       dataIndex: 'totalRevenue',
       key: 'totalRevenue',
       width: 140,
-      render: (revenue: number) => `$${revenue.toLocaleString()}`,
+      render: (revenue: number) => `$${(revenue || 0).toLocaleString()}`,
     },
     {
       title: '總成本',
       dataIndex: 'totalCost',
       key: 'totalCost',
       width: 140,
-      render: (cost: number) => `$${cost.toLocaleString()}`,
+      render: (cost: number) => `$${(cost || 0).toLocaleString()}`,
     },
     {
       title: '買入A',
       dataIndex: 'fishAPurchased',
       key: 'fishAPurchased',
       width: 100,
-      render: (qty: number) => `${qty} kg`,
+      render: (qty: number) => `${qty || 0} kg`,
     },
     {
       title: '賣出A',
       dataIndex: 'fishASold',
       key: 'fishASold',
       width: 100,
-      render: (qty: number) => `${qty} kg`,
+      render: (qty: number) => `${qty || 0} kg`,
     },
     {
       title: '買入B',
       dataIndex: 'fishBPurchased',
       key: 'fishBPurchased',
       width: 100,
-      render: (qty: number) => `${qty} kg`,
+      render: (qty: number) => `${qty || 0} kg`,
     },
     {
       title: '賣出B',
       dataIndex: 'fishBSold',
       key: 'fishBSold',
       width: 100,
-      render: (qty: number) => `${qty} kg`,
+      render: (qty: number) => `${qty || 0} kg`,
     },
   ]
 
@@ -406,10 +406,10 @@ export default function FinalAnalysisPage() {
     if (finalRankings.length === 0) return null
 
     const winner = finalRankings[0]
-    const avgRoi = finalRankings.reduce((sum, r) => sum + r.roi, 0) / finalRankings.length
-    const avgProfit = finalRankings.reduce((sum, r) => sum + r.cumulativeProfit, 0) / finalRankings.length
-    const maxProfit = Math.max(...finalRankings.map(r => r.cumulativeProfit))
-    const minProfit = Math.min(...finalRankings.map(r => r.cumulativeProfit))
+    const avgRoi = finalRankings.reduce((sum, r) => sum + (r.roi || 0), 0) / finalRankings.length
+    const avgProfit = finalRankings.reduce((sum, r) => sum + (r.cumulativeProfit || 0), 0) / finalRankings.length
+    const maxProfit = Math.max(...finalRankings.map(r => r.cumulativeProfit || 0))
+    const minProfit = Math.min(...finalRankings.map(r => r.cumulativeProfit || 0))
 
     return {
       winner,
@@ -455,20 +455,20 @@ export default function FinalAnalysisPage() {
             </Descriptions.Item>
             <Descriptions.Item label="遊戲天數">{game.currentDay} / {game.totalDays} 天</Descriptions.Item>
             <Descriptions.Item label="參與團隊">{game.numTeams} 隊</Descriptions.Item>
-            <Descriptions.Item label="初始預算">${game.initialBudget.toLocaleString()}</Descriptions.Item>
-            <Descriptions.Item label="貸款利率">{(game.loanInterestRate * 100).toFixed(1)}%</Descriptions.Item>
-            <Descriptions.Item label="最大借貸倍數">{game.maxLoanRatio}x</Descriptions.Item>
+            <Descriptions.Item label="初始預算">${(game.initialBudget || 0).toLocaleString()}</Descriptions.Item>
+            <Descriptions.Item label="貸款利率">{((game.loanInterestRate || 0) * 100).toFixed(1)}%</Descriptions.Item>
+            <Descriptions.Item label="最大借貸倍數">{game.maxLoanRatio || 0}x</Descriptions.Item>
           </Descriptions>
         </Card>
 
         {/* 關鍵統計 */}
-        {stats && (
+        {stats && stats.winner && (
           <Row gutter={[16, 16]}>
             <Col xs={24} sm={12} md={6}>
               <Card>
                 <Statistic
                   title="冠軍團隊"
-                  value={stats.winner.teamNumber}
+                  value={stats.winner.teamNumber || '?'}
                   prefix={<TrophyOutlined style={{ color: '#FFD700' }} />}
                   suffix="隊"
                   valueStyle={{ color: '#1890ff', fontSize: 32 }}
@@ -479,7 +479,7 @@ export default function FinalAnalysisPage() {
               <Card>
                 <Statistic
                   title="冠軍ROI"
-                  value={(stats.winner.roi * 100).toFixed(2)}
+                  value={((stats.winner.roi || 0) * 100).toFixed(2)}
                   suffix="%"
                   prefix={<RiseOutlined />}
                   valueStyle={{ color: '#52c41a', fontSize: 32 }}
@@ -490,7 +490,7 @@ export default function FinalAnalysisPage() {
               <Card>
                 <Statistic
                   title="平均ROI"
-                  value={(stats.avgRoi * 100).toFixed(2)}
+                  value={((stats.avgRoi || 0) * 100).toFixed(2)}
                   suffix="%"
                   valueStyle={{ fontSize: 32 }}
                 />
@@ -500,7 +500,7 @@ export default function FinalAnalysisPage() {
               <Card>
                 <Statistic
                   title="平均收益"
-                  value={stats.avgProfit}
+                  value={stats.avgProfit || 0}
                   prefix={<DollarOutlined />}
                   valueStyle={{ fontSize: 32 }}
                 />

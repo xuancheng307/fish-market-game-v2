@@ -108,12 +108,12 @@ export default function StatsPage() {
       key: 'roi',
       width: 120,
       render: (roi: number) => (
-        <Tag color={roi > 0 ? 'success' : roi < 0 ? 'error' : 'default'}>
-          {roi > 0 ? <RiseOutlined /> : roi < 0 ? <FallOutlined /> : null}
-          {' '}{(roi * 100).toFixed(2)}%
+        <Tag color={(roi || 0) > 0 ? 'success' : (roi || 0) < 0 ? 'error' : 'default'}>
+          {(roi || 0) > 0 ? <RiseOutlined /> : (roi || 0) < 0 ? <FallOutlined /> : null}
+          {' '}{((roi || 0) * 100).toFixed(2)}%
         </Tag>
       ),
-      sorter: (a: DailyResult, b: DailyResult) => b.roi - a.roi,
+      sorter: (a: DailyResult, b: DailyResult) => (b.roi || 0) - (a.roi || 0),
       defaultSortOrder: 'ascend' as const,
     },
     {
@@ -209,7 +209,7 @@ export default function StatsPage() {
     if (!dailyResults.length) return {}
 
     // 按 ROI 排序
-    const sortedResults = [...dailyResults].sort((a, b) => b.roi - a.roi)
+    const sortedResults = [...dailyResults].sort((a, b) => (b.roi || 0) - (a.roi || 0))
 
     return {
       title: {
@@ -220,12 +220,12 @@ export default function StatsPage() {
         trigger: 'axis',
         formatter: (params: any) => {
           const data = params[0]
-          return `第 ${data.name} 隊<br/>ROI: ${(data.value * 100).toFixed(2)}%`
+          return `第 ${data.name} 隊<br/>ROI: ${((data.value || 0) * 100).toFixed(2)}%`
         },
       },
       xAxis: {
         type: 'category',
-        data: sortedResults.map(r => `第${r.teamNumber}隊`),
+        data: sortedResults.map(r => `第${r.teamNumber || '?'}隊`),
         axisLabel: {
           interval: 0,
           rotate: 45,
@@ -235,23 +235,23 @@ export default function StatsPage() {
         type: 'value',
         name: 'ROI (%)',
         axisLabel: {
-          formatter: (value: number) => (value * 100).toFixed(0) + '%',
+          formatter: (value: number) => ((value || 0) * 100).toFixed(0) + '%',
         },
       },
       series: [
         {
           name: 'ROI',
           type: 'bar',
-          data: sortedResults.map(r => r.roi),
+          data: sortedResults.map(r => r.roi || 0),
           itemStyle: {
             color: (params: any) => {
-              return params.value > 0 ? '#52c41a' : params.value < 0 ? '#ff4d4f' : '#d9d9d9'
+              return (params.value || 0) > 0 ? '#52c41a' : (params.value || 0) < 0 ? '#ff4d4f' : '#d9d9d9'
             },
           },
           label: {
             show: true,
             position: 'top',
-            formatter: (params: any) => (params.value * 100).toFixed(2) + '%',
+            formatter: (params: any) => ((params.value || 0) * 100).toFixed(2) + '%',
           },
         },
       ],
@@ -266,7 +266,7 @@ export default function StatsPage() {
   const getCumulativeProfitChartOption = () => {
     if (!dailyResults.length) return {}
 
-    const sortedResults = [...dailyResults].sort((a, b) => b.cumulativeProfit - a.cumulativeProfit)
+    const sortedResults = [...dailyResults].sort((a, b) => (b.cumulativeProfit || 0) - (a.cumulativeProfit || 0))
 
     return {
       title: {
@@ -277,12 +277,12 @@ export default function StatsPage() {
         trigger: 'axis',
         formatter: (params: any) => {
           const data = params[0]
-          return `第 ${data.name} 隊<br/>累積收益: $${data.value.toLocaleString()}`
+          return `第 ${data.name} 隊<br/>累積收益: $${(data.value || 0).toLocaleString()}`
         },
       },
       xAxis: {
         type: 'category',
-        data: sortedResults.map(r => `第${r.teamNumber}隊`),
+        data: sortedResults.map(r => `第${r.teamNumber || '?'}隊`),
         axisLabel: {
           interval: 0,
           rotate: 45,
@@ -292,23 +292,23 @@ export default function StatsPage() {
         type: 'value',
         name: '累積收益 ($)',
         axisLabel: {
-          formatter: (value: number) => '$' + (value / 1000).toFixed(0) + 'K',
+          formatter: (value: number) => '$' + ((value || 0) / 1000).toFixed(0) + 'K',
         },
       },
       series: [
         {
           name: '累積收益',
           type: 'bar',
-          data: sortedResults.map(r => r.cumulativeProfit),
+          data: sortedResults.map(r => r.cumulativeProfit || 0),
           itemStyle: {
             color: (params: any) => {
-              return params.value > 0 ? '#1890ff' : params.value < 0 ? '#ff4d4f' : '#d9d9d9'
+              return (params.value || 0) > 0 ? '#1890ff' : (params.value || 0) < 0 ? '#ff4d4f' : '#d9d9d9'
             },
           },
           label: {
             show: true,
             position: 'top',
-            formatter: (params: any) => '$' + (params.value / 1000).toFixed(1) + 'K',
+            formatter: (params: any) => '$' + ((params.value || 0) / 1000).toFixed(1) + 'K',
           },
         },
       ],
