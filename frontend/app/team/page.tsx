@@ -292,13 +292,19 @@ export default function TeamHomePage() {
           />
         )}
 
-        {/* 市場參考價格 */}
+        {/* 市場參考價格與供貨量 */}
         {game && (
-          <Card title={<><InfoCircleOutlined /> 市場參考價格</>} size="small">
+          <Card title={<><InfoCircleOutlined /> 市場資訊</>} size="small">
             <Row gutter={16}>
               <Col xs={24} md={12}>
                 <Card size="small" style={{ background: '#f5f0ff' }}>
                   <Descriptions title="A級魚" column={2} size="small">
+                    <Descriptions.Item label="今日供貨量">
+                      <Tag color="purple">{gameDay?.fishASupply || 0} kg</Tag>
+                    </Descriptions.Item>
+                    <Descriptions.Item label="餐廳總預算">
+                      ${(gameDay?.fishARestaurantBudget || 0).toLocaleString()}
+                    </Descriptions.Item>
                     <Descriptions.Item label="底價（總代理）">${game.distributorFloorPriceA}</Descriptions.Item>
                     <Descriptions.Item label="目標價（預算參考）">${game.targetPriceA}</Descriptions.Item>
                   </Descriptions>
@@ -307,6 +313,12 @@ export default function TeamHomePage() {
               <Col xs={24} md={12}>
                 <Card size="small" style={{ background: '#fff7e6' }}>
                   <Descriptions title="B級魚" column={2} size="small">
+                    <Descriptions.Item label="今日供貨量">
+                      <Tag color="orange">{gameDay?.fishBSupply || 0} kg</Tag>
+                    </Descriptions.Item>
+                    <Descriptions.Item label="餐廳總預算">
+                      ${(gameDay?.fishBRestaurantBudget || 0).toLocaleString()}
+                    </Descriptions.Item>
                     <Descriptions.Item label="底價（總代理）">${game.distributorFloorPriceB}</Descriptions.Item>
                     <Descriptions.Item label="目標價（預算參考）">${game.targetPriceB}</Descriptions.Item>
                   </Descriptions>

@@ -19,12 +19,13 @@ const { asyncHandler } = require('../middleware/errorHandler');
 class TeamController {
     /**
      * GET /api/team/active-game - 獲取當前進行中的遊戲
+     * ⚠️ 只返回該用戶有參與的 active 遊戲
      */
     static getActiveGame = asyncHandler(async (req, res) => {
         const games = await Game.findAll();
-        const activeGame = games.find(g => g.status === 'active');
+        const activeGames = games.filter(g => g.status === 'active');
 
-        if (!activeGame) {
+        if (activeGames.length === 0) {
             return res.json({
                 success: true,
                 data: null,
@@ -32,9 +33,27 @@ class TeamController {
             });
         }
 
+        // 找到用戶有參與的 active 遊戲
+        let myActiveGame = null;
+        for (const game of activeGames) {
+            const team = await Team.findByGameAndUser(game.id, req.user.id);
+            if (team) {
+                myActiveGame = game;
+                break;
+            }
+        }
+
+        if (!myActiveGame) {
+            return res.json({
+                success: true,
+                data: null,
+                message: '您未參與任何進行中的遊戲'
+            });
+        }
+
         res.json({
             success: true,
-            data: gameToApi(activeGame),
+            data: gameToApi(myActiveGame),
             message: '獲取成功'
         });
     });
