@@ -273,8 +273,12 @@ class AdminController {
 
         // 如果是查詢特定天數，進行排名
         if (dayNumber && results.length > 0) {
-            // 按 ROI 降序排序並添加排名
-            results.sort((a, b) => b.roi - a.roi);
+            // 按 ROI 降序排序並添加排名（安全處理 null/undefined/字串）
+            results.sort((a, b) => {
+                const roiA = parseFloat(a.roi) || 0;
+                const roiB = parseFloat(b.roi) || 0;
+                return roiB - roiA;
+            });
             results = results.map((result, index) => ({
                 ...result,
                 rank: index + 1

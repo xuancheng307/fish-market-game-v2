@@ -41,7 +41,7 @@ class BidService {
         // 3. 獲取團隊資訊
         const team = await Team.findByGameAndUser(gameId, teamId);
         if (!team) {
-            throw new AppError('找不到團隊', ERROR_CODES.GAME_NOT_FOUND, 404);
+            throw new AppError('找不到團隊，請確認您已加入此遊戲', ERROR_CODES.UNAUTHORIZED, 404);
         }
 
         // 4. 檢查每種魚最多2個不同價格限制
@@ -149,7 +149,7 @@ class BidService {
     static async getTeamBids(teamId, gameId, dayNumber = null) {
         const team = await Team.findByGameAndUser(gameId, teamId);
         if (!team) {
-            throw new AppError('找不到團隊', ERROR_CODES.GAME_NOT_FOUND, 404);
+            throw new AppError('找不到團隊，請確認您已加入此遊戲', ERROR_CODES.UNAUTHORIZED, 404);
         }
 
         if (dayNumber) {
@@ -165,10 +165,13 @@ class BidService {
     static async updateBid(bidId, teamId, updates) {
         const bid = await Bid.findById(bidId);
         if (!bid) {
-            throw new AppError('投標不存在', ERROR_CODES.GAME_NOT_FOUND, 404);
+            throw new AppError('投標不存在', ERROR_CODES.INVALID_BID, 404);
         }
 
         const team = await Team.findById(bid.team_id);
+        if (!team) {
+            throw new AppError('團隊不存在', ERROR_CODES.UNAUTHORIZED, 404);
+        }
         if (team.user_id !== teamId) {
             throw new AppError('無權修改此投標', ERROR_CODES.UNAUTHORIZED, 403);
         }
@@ -248,10 +251,13 @@ class BidService {
     static async deleteBid(bidId, teamId) {
         const bid = await Bid.findById(bidId);
         if (!bid) {
-            throw new AppError('投標不存在', ERROR_CODES.GAME_NOT_FOUND, 404);
+            throw new AppError('投標不存在', ERROR_CODES.INVALID_BID, 404);
         }
 
         const team = await Team.findById(bid.team_id);
+        if (!team) {
+            throw new AppError('團隊不存在', ERROR_CODES.UNAUTHORIZED, 404);
+        }
         if (team.user_id !== teamId) {
             throw new AppError('無權刪除此投標', ERROR_CODES.UNAUTHORIZED, 403);
         }

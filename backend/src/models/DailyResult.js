@@ -115,6 +115,14 @@ class DailyResult {
      * @param {object} updateData - 要更新的欄位
      */
     static async upsertPartial(gameId, gameDayId, teamId, dayNumber, updateData) {
+        // 允許更新的欄位白名單（防止 SQL injection）
+        const ALLOWED_FIELDS = [
+            'revenue', 'cost', 'profit', 'interest_paid', 'unsold_fee',
+            'cash', 'total_loan', 'fish_a_inventory', 'fish_b_inventory',
+            'fish_a_purchased', 'fish_a_sold', 'fish_b_purchased', 'fish_b_sold',
+            'fish_a_unsold', 'fish_b_unsold', 'cumulative_profit', 'roi'
+        ];
+
         // 檢查是否已存在
         const existing = await this.findByTeamAndDay(teamId, gameId, dayNumber);
 
@@ -124,6 +132,11 @@ class DailyResult {
             const values = [];
 
             for (const [key, value] of Object.entries(updateData)) {
+                // 只允許白名單中的欄位
+                if (!ALLOWED_FIELDS.includes(key)) {
+                    console.warn(`[DailyResult] 忽略不允許的欄位: ${key}`);
+                    continue;
+                }
                 fields.push(`${key} = ?`);
                 values.push(value);
             }
