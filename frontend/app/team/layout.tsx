@@ -38,7 +38,8 @@ export default function TeamLayout({
 
       // 獲取當前用戶資訊
       const userStr = localStorage.getItem('user')
-      if (!userStr) {
+      const token = localStorage.getItem('token')
+      if (!userStr || !token) {
         router.push('/login')
         return
       }
@@ -48,6 +49,11 @@ export default function TeamLayout({
         message.error('權限不足')
         router.push('/login')
         return
+      }
+
+      // 連接 WebSocket（如果尚未連接）
+      if (!wsClient.isConnected()) {
+        wsClient.connect(token)
       }
 
       // 獲取進行中的遊戲
