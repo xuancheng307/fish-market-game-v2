@@ -12,7 +12,8 @@ const {
     gameDayToApi,
     teamToApi,
     bidToApi,
-    dailyResultToApi
+    dailyResultToApi,
+    apiToGame
 } = require('../utils/transformers');
 const { asyncHandler } = require('../middleware/errorHandler');
 
@@ -21,7 +22,9 @@ class AdminController {
      * POST /api/admin/games - 創建遊戲
      */
     static createGame = asyncHandler(async (req, res) => {
-        const game = await GameService.createGame(req.body);
+        // ⚠️ 將 camelCase 轉換為 snake_case
+        const gameData = apiToGame(req.body);
+        const game = await GameService.createGame(gameData);
 
         res.json({
             success: true,
