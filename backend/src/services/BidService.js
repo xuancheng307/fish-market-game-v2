@@ -78,21 +78,41 @@ class BidService {
                 );
             }
 
-            const requiredAmount = price * quantity;
-            const loanResult = await LoanService.checkAndBorrow(team.id, requiredAmount);
+            const newAmount = price * quantity;
+            let loanResult;
 
-            let bid;
             if (bidToOverwrite) {
-                // ⚠️ 覆寫現有標單
-                bid = await Bid.update(bidToOverwrite.id, {
+                // ⚠️ 覆寫時只借差額（新金額 - 舊金額）
+                const oldAmount = parseFloat(bidToOverwrite.price) * bidToOverwrite.quantity_submitted;
+                const difference = newAmount - oldAmount;
+
+                if (difference > 0) {
+                    // 新標單金額更大，需要額外借款
+                    loanResult = await LoanService.checkAndBorrow(team.id, difference);
+                } else {
+                    // 新標單金額較小或相等，不需借款（也不退款）
+                    loanResult = { borrowed: false, loanAmount: 0 };
+                }
+
+                // 覆寫現有標單
+                const bid = await Bid.update(bidToOverwrite.id, {
                     price,
                     quantity_submitted: quantity,
                     created_at: new Date()  // 更新提交時間
                 });
-                console.log(`[BidService] 覆寫買入標單 #${bidToOverwrite.id} → 價格:${price}, 數量:${quantity}`);
+                console.log(`[BidService] 覆寫買入標單 #${bidToOverwrite.id} → 價格:${price}, 數量:${quantity}, 差額:${difference}`);
+
+                return {
+                    bid,
+                    loanInfo: loanResult,
+                    overwritten: bidToOverwrite.id
+                };
             } else {
+                // 新標單：借全額
+                loanResult = await LoanService.checkAndBorrow(team.id, newAmount);
+
                 // 創建新標單
-                bid = await Bid.create({
+                const bid = await Bid.create({
                     game_id: gameId,
                     game_day_id: gameDay.id,
                     day_number: game.current_day,
@@ -102,13 +122,13 @@ class BidService {
                     price,
                     quantity_submitted: quantity
                 });
-            }
 
-            return {
-                bid,
-                loanInfo: loanResult,
-                overwritten: bidToOverwrite ? bidToOverwrite.id : null
-            };
+                return {
+                    bid,
+                    loanInfo: loanResult,
+                    overwritten: null
+                };
+            }
         }
 
         // 6. 賣出投標：檢查庫存
