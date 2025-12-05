@@ -69,12 +69,19 @@ async function runMigrations() {
                     executedStatements++;
                     console.log(`[Migration] ✓ ${migrationFile} - 語句 ${i + 1}/${statements.length} 執行成功`);
                 } catch (error) {
-                    // 忽略 "table already exists", "column already exists", "duplicate key/constraint" 錯誤
-                    if (error.code === 'ER_TABLE_EXISTS_ERROR' ||
-                        error.code === 'ER_DUP_FIELDNAME' ||
-                        error.code === 'ER_DUP_KEYNAME' ||
-                        error.message.includes('Duplicate foreign key constraint')) {
-                        console.log(`[Migration] ⚠ ${migrationFile} - 語句 ${i + 1}/${statements.length} - 已存在，跳過`);
+                    // 忽略常見的「已完成」或「不需要執行」的錯誤
+                    const ignorableErrors = [
+                        'ER_TABLE_EXISTS_ERROR',     // 表已存在
+                        'ER_DUP_FIELDNAME',          // 欄位已存在
+                        'ER_DUP_KEYNAME',            // 索引已存在
+                        'ER_BAD_FIELD_ERROR',        // 欄位不存在（可能已被重命名或刪除）
+                        'ER_CANT_DROP_FIELD_OR_KEY'  // 無法刪除欄位或索引
+                    ];
+
+                    if (ignorableErrors.includes(error.code) ||
+                        error.message.includes('Duplicate foreign key constraint') ||
+                        error.message.includes('Unknown column')) {
+                        console.log(`[Migration] ⚠ ${migrationFile} - 語句 ${i + 1}/${statements.length} - 已處理或不需要，跳過`);
                     } else {
                         console.error(`[Migration] ✗ ${migrationFile} - 語句 ${i + 1} 執行失敗:`, error.message);
                         throw error;
