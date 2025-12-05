@@ -105,6 +105,62 @@ class DailyResult {
             [gameId, dayNumber]
         );
     }
+
+    /**
+     * 更新或創建每日結果 (用於買入/賣出結算後立即更新)
+     * @param {number} gameId
+     * @param {number} gameDayId
+     * @param {number} teamId
+     * @param {number} dayNumber
+     * @param {object} updateData - 要更新的欄位
+     */
+    static async upsertPartial(gameId, gameDayId, teamId, dayNumber, updateData) {
+        // 檢查是否已存在
+        const existing = await this.findByTeamAndDay(teamId, gameId, dayNumber);
+
+        if (existing) {
+            // 更新現有記錄
+            const fields = [];
+            const values = [];
+
+            for (const [key, value] of Object.entries(updateData)) {
+                fields.push(`${key} = ?`);
+                values.push(value);
+            }
+
+            if (fields.length > 0) {
+                values.push(existing.id);
+                await query(
+                    `UPDATE daily_results SET ${fields.join(', ')} WHERE id = ?`,
+                    values
+                );
+            }
+
+            return await this.findById(existing.id);
+        } else {
+            // 創建新記錄 (使用預設值)
+            const result = await query(
+                `INSERT INTO daily_results (
+                    game_id, game_day_id, team_id, day_number,
+                    revenue, cost, profit, interest_paid, unsold_fee,
+                    cash, total_loan,
+                    fish_a_inventory, fish_b_inventory,
+                    fish_a_purchased, fish_a_sold, fish_b_purchased, fish_b_sold,
+                    fish_a_unsold, fish_b_unsold,
+                    cumulative_profit, roi
+                ) VALUES (?, ?, ?, ?, 0, 0, 0, 0, 0, 0, 0, 0, 0, ?, ?, ?, ?, 0, 0, 0, 0)`,
+                [
+                    gameId, gameDayId, teamId, dayNumber,
+                    updateData.fish_a_purchased || 0,
+                    updateData.fish_a_sold || 0,
+                    updateData.fish_b_purchased || 0,
+                    updateData.fish_b_sold || 0
+                ]
+            );
+
+            return await this.findById(result.insertId);
+        }
+    }
 }
 
 module.exports = DailyResult;

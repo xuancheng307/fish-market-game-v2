@@ -31,6 +31,10 @@ export default function GameControlPage() {
   const [settlementModalVisible, setSettlementModalVisible] = useState(false)
   const [settlementResults, setSettlementResults] = useState<DailyResult[]>([])
   const [settlementDay, setSettlementDay] = useState<number>(0)
+  const [settlementPriceStats, setSettlementPriceStats] = useState<{
+    buy: { fishA: { highestPrice: number | null; lowestPrice: number | null }; fishB: { highestPrice: number | null; lowestPrice: number | null } } | null
+    sell: { fishA: { highestPrice: number | null; lowestPrice: number | null }; fishB: { highestPrice: number | null; lowestPrice: number | null } } | null
+  }>({ buy: null, sell: null })
 
   // 供給量/資金池輸入 Modal 狀態
   const [supplyModalVisible, setSupplyModalVisible] = useState(false)
@@ -162,20 +166,46 @@ export default function GameControlPage() {
     setActionLoading(true)
     try {
       switch (action) {
-        case 'closeBuying':
-          await api.closeBuying(game.id)
+        case 'closeBuying': {
+          const response = await api.closeBuying(game.id)
+          // 儲存買入結算價格統計
+          if (response.data?.settlementResults) {
+            const results = response.data.settlementResults
+            setSettlementPriceStats(prev => ({
+              ...prev,
+              buy: {
+                fishA: { highestPrice: results.fishA?.highestPrice ?? null, lowestPrice: results.fishA?.lowestPrice ?? null },
+                fishB: { highestPrice: results.fishB?.highestPrice ?? null, lowestPrice: results.fishB?.lowestPrice ?? null }
+              }
+            }))
+          }
           message.success('已關閉買入投標')
           break
-        case 'closeSelling':
-          await api.closeSelling(game.id)
+        }
+        case 'closeSelling': {
+          const response = await api.closeSelling(game.id)
+          // 儲存賣出結算價格統計
+          if (response.data?.settlementResults) {
+            const results = response.data.settlementResults
+            setSettlementPriceStats(prev => ({
+              ...prev,
+              sell: {
+                fishA: { highestPrice: results.fishA?.highestPrice ?? null, lowestPrice: results.fishA?.lowestPrice ?? null },
+                fishB: { highestPrice: results.fishB?.highestPrice ?? null, lowestPrice: results.fishB?.lowestPrice ?? null }
+              }
+            }))
+          }
           message.success('已關閉賣出投標')
           break
+        }
         case 'settle':
           await api.settleDay(game.id)
           message.success('當日結算完成')
           break
         case 'nextDay':
           await api.nextDay(game.id)
+          // 進入下一天時，清除價格統計
+          setSettlementPriceStats({ buy: null, sell: null })
           message.success('已進入下一天')
           break
       }
@@ -332,6 +362,81 @@ export default function GameControlPage() {
       biddedTeams,
       notBiddedTeams,
       progress: Math.round((biddedTeams.length / teams.length) * 100)
+    }
+  }
+
+  // 處理投標資料：同一隊放同一排
+  const getTeamBidsSummary = (bidType: 'buy' | 'sell') => {
+    const filteredBids = allBids.filter(bid => bid.bidType === bidType)
+
+    // 按團隊分組
+    const teamBidsMap = new Map<number, {
+      teamNumber: number
+      teamName: string
+      fishABids: Array<{ price: number; quantity: number }>
+      fishBBids: Array<{ price: number; quantity: number }>
+      latestTime: string
+    }>()
+
+    for (const bid of filteredBids) {
+      const team = teams.find(t => t.id === bid.teamId)
+      if (!team) continue
+
+      if (!teamBidsMap.has(bid.teamId)) {
+        teamBidsMap.set(bid.teamId, {
+          teamNumber: team.teamNumber,
+          teamName: team.teamName,
+          fishABids: [],
+          fishBBids: [],
+          latestTime: bid.createdAt
+        })
+      }
+
+      const teamData = teamBidsMap.get(bid.teamId)!
+      if (bid.fishType === 'A') {
+        teamData.fishABids.push({ price: bid.price, quantity: bid.quantitySubmitted })
+      } else {
+        teamData.fishBBids.push({ price: bid.price, quantity: bid.quantitySubmitted })
+      }
+
+      // 更新最新時間
+      if (new Date(bid.createdAt) > new Date(teamData.latestTime)) {
+        teamData.latestTime = bid.createdAt
+      }
+    }
+
+    // 轉換為陣列並按團隊編號排序
+    return Array.from(teamBidsMap.values()).sort((a, b) => a.teamNumber - b.teamNumber)
+  }
+
+  // 計算成交價格統計
+  const getPriceStats = (bidType: 'buy' | 'sell') => {
+    const filteredBids = allBids.filter(bid => bid.bidType === bidType && (bid.quantityFulfilled ?? 0) > 0)
+
+    if (filteredBids.length === 0) return null
+
+    const prices = filteredBids.map(bid => bid.price)
+    const highestPrice = Math.max(...prices)
+    const lowestPrice = Math.min(...prices)
+
+    // 計算成交額
+    const fishABids = filteredBids.filter(b => b.fishType === 'A')
+    const fishBBids = filteredBids.filter(b => b.fishType === 'B')
+
+    const fishAVolume = fishABids.reduce((sum, b) => sum + (b.quantityFulfilled ?? 0), 0)
+    const fishBVolume = fishBBids.reduce((sum, b) => sum + (b.quantityFulfilled ?? 0), 0)
+    const fishATotal = fishABids.reduce((sum, b) => sum + (b.price * (b.quantityFulfilled ?? 0)), 0)
+    const fishBTotal = fishBBids.reduce((sum, b) => sum + (b.price * (b.quantityFulfilled ?? 0)), 0)
+
+    return {
+      highestPrice,
+      lowestPrice,
+      fishAVolume,
+      fishBVolume,
+      fishATotal,
+      fishBTotal,
+      totalVolume: fishAVolume + fishBVolume,
+      totalAmount: fishATotal + fishBTotal
     }
   }
 
@@ -523,6 +628,95 @@ export default function GameControlPage() {
                   style={{ marginTop: 16 }}
                 />
               )}
+
+              {/* 團隊投標摘要表格 */}
+              {biddingProgress.bidded > 0 && (
+                <div style={{ marginTop: 24 }}>
+                  <h4 style={{ marginBottom: 12 }}>投標詳情</h4>
+                  <Table
+                    dataSource={getTeamBidsSummary(biddingProgress.phase as 'buy' | 'sell')}
+                    rowKey="teamNumber"
+                    size="small"
+                    pagination={false}
+                    columns={[
+                      {
+                        title: '團隊',
+                        dataIndex: 'teamNumber',
+                        key: 'teamNumber',
+                        width: 80,
+                        render: (num: number) => `第 ${num} 組`,
+                      },
+                      {
+                        title: 'A魚 價格1',
+                        key: 'fishAPrice1',
+                        width: 90,
+                        render: (_: any, record: any) =>
+                          record.fishABids[0] ? `$${record.fishABids[0].price}` : '-',
+                      },
+                      {
+                        title: 'A魚 數量1',
+                        key: 'fishAQty1',
+                        width: 90,
+                        render: (_: any, record: any) =>
+                          record.fishABids[0] ? `${record.fishABids[0].quantity}kg` : '-',
+                      },
+                      {
+                        title: 'A魚 價格2',
+                        key: 'fishAPrice2',
+                        width: 90,
+                        render: (_: any, record: any) =>
+                          record.fishABids[1] ? `$${record.fishABids[1].price}` : '-',
+                      },
+                      {
+                        title: 'A魚 數量2',
+                        key: 'fishAQty2',
+                        width: 90,
+                        render: (_: any, record: any) =>
+                          record.fishABids[1] ? `${record.fishABids[1].quantity}kg` : '-',
+                      },
+                      {
+                        title: 'B魚 價格1',
+                        key: 'fishBPrice1',
+                        width: 90,
+                        render: (_: any, record: any) =>
+                          record.fishBBids[0] ? `$${record.fishBBids[0].price}` : '-',
+                      },
+                      {
+                        title: 'B魚 數量1',
+                        key: 'fishBQty1',
+                        width: 90,
+                        render: (_: any, record: any) =>
+                          record.fishBBids[0] ? `${record.fishBBids[0].quantity}kg` : '-',
+                      },
+                      {
+                        title: 'B魚 價格2',
+                        key: 'fishBPrice2',
+                        width: 90,
+                        render: (_: any, record: any) =>
+                          record.fishBBids[1] ? `$${record.fishBBids[1].price}` : '-',
+                      },
+                      {
+                        title: 'B魚 數量2',
+                        key: 'fishBQty2',
+                        width: 90,
+                        render: (_: any, record: any) =>
+                          record.fishBBids[1] ? `${record.fishBBids[1].quantity}kg` : '-',
+                      },
+                      {
+                        title: '提交時間',
+                        key: 'latestTime',
+                        width: 100,
+                        render: (_: any, record: any) =>
+                          new Date(record.latestTime).toLocaleTimeString('zh-TW', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            second: '2-digit',
+                          }),
+                      },
+                    ]}
+                  />
+                </div>
+              )}
             </Card>
           </Col>
         )}
@@ -670,6 +864,66 @@ export default function GameControlPage() {
           icon={<CheckCircleOutlined />}
           style={{ marginBottom: 16 }}
         />
+
+        {/* 成交價格統計 */}
+        <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
+          <Col xs={24} md={12}>
+            <Card size="small" title="買入成交價格">
+              <Row gutter={16}>
+                <Col span={12}>
+                  <Statistic
+                    title="A魚最高成交價"
+                    value={settlementPriceStats.buy?.fishA?.highestPrice ?? '-'}
+                    prefix={settlementPriceStats.buy?.fishA?.highestPrice != null ? '$' : ''}
+                    valueStyle={{ color: '#cf1322', fontSize: 18 }}
+                  />
+                  <div style={{ fontSize: 12, color: '#888', marginTop: 4 }}>
+                    最低: {settlementPriceStats.buy?.fishA?.lowestPrice != null ? `$${settlementPriceStats.buy?.fishA?.lowestPrice}` : '-'}
+                  </div>
+                </Col>
+                <Col span={12}>
+                  <Statistic
+                    title="B魚最高成交價"
+                    value={settlementPriceStats.buy?.fishB?.highestPrice ?? '-'}
+                    prefix={settlementPriceStats.buy?.fishB?.highestPrice != null ? '$' : ''}
+                    valueStyle={{ color: '#cf1322', fontSize: 18 }}
+                  />
+                  <div style={{ fontSize: 12, color: '#888', marginTop: 4 }}>
+                    最低: {settlementPriceStats.buy?.fishB?.lowestPrice != null ? `$${settlementPriceStats.buy?.fishB?.lowestPrice}` : '-'}
+                  </div>
+                </Col>
+              </Row>
+            </Card>
+          </Col>
+          <Col xs={24} md={12}>
+            <Card size="small" title="賣出成交價格">
+              <Row gutter={16}>
+                <Col span={12}>
+                  <Statistic
+                    title="A魚最高成交價"
+                    value={settlementPriceStats.sell?.fishA?.highestPrice ?? '-'}
+                    prefix={settlementPriceStats.sell?.fishA?.highestPrice != null ? '$' : ''}
+                    valueStyle={{ color: '#3f8600', fontSize: 18 }}
+                  />
+                  <div style={{ fontSize: 12, color: '#888', marginTop: 4 }}>
+                    最低: {settlementPriceStats.sell?.fishA?.lowestPrice != null ? `$${settlementPriceStats.sell?.fishA?.lowestPrice}` : '-'}
+                  </div>
+                </Col>
+                <Col span={12}>
+                  <Statistic
+                    title="B魚最高成交價"
+                    value={settlementPriceStats.sell?.fishB?.highestPrice ?? '-'}
+                    prefix={settlementPriceStats.sell?.fishB?.highestPrice != null ? '$' : ''}
+                    valueStyle={{ color: '#3f8600', fontSize: 18 }}
+                  />
+                  <div style={{ fontSize: 12, color: '#888', marginTop: 4 }}>
+                    最低: {settlementPriceStats.sell?.fishB?.lowestPrice != null ? `$${settlementPriceStats.sell?.fishB?.lowestPrice}` : '-'}
+                  </div>
+                </Col>
+              </Row>
+            </Card>
+          </Col>
+        </Row>
 
         <Table
           dataSource={settlementResults}

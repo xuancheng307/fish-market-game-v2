@@ -22,6 +22,7 @@ class SettlementService {
     /**
      * 買入結算 (批發商 → 團隊)
      * ⚠️ 關鍵：高價優先成交，無滯銷
+     * ⚠️ 結算後立即更新 daily_results 的買入成交量
      */
     static async settleBuyingPhase(gameId, dayNumber) {
         const gameDay = await GameDay.findByGameAndDay(gameId, dayNumber);
@@ -36,7 +37,41 @@ class SettlementService {
             fishB: await this._settleBuyingForFishType(gameId, dayNumber, FISH_TYPE.B, game, gameDay)
         };
 
+        // ⚠️ 立即更新 daily_results 的買入成交量
+        await this._updateBuyingResults(gameId, gameDay.id, dayNumber);
+
         return results;
+    }
+
+    /**
+     * 更新每隊的買入成交量到 daily_results
+     */
+    static async _updateBuyingResults(gameId, gameDayId, dayNumber) {
+        const teams = await Team.findByGame(gameId);
+        const { BID_TYPE, FISH_TYPE } = require('../config/constants');
+
+        for (const team of teams) {
+            // 從 bids 表彙總買入成交量
+            const bids = await Bid.findByGameDay(gameId, dayNumber, { team_id: team.id, bid_type: BID_TYPE.BUY });
+
+            let fishAPurchased = 0;
+            let fishBPurchased = 0;
+
+            for (const bid of bids) {
+                const qty = bid.quantity_fulfilled || 0;
+                if (bid.fish_type === FISH_TYPE.A) {
+                    fishAPurchased += qty;
+                } else if (bid.fish_type === FISH_TYPE.B) {
+                    fishBPurchased += qty;
+                }
+            }
+
+            // 更新或創建 daily_results 記錄
+            await DailyResult.upsertPartial(gameId, gameDayId, team.id, dayNumber, {
+                fish_a_purchased: fishAPurchased,
+                fish_b_purchased: fishBPurchased
+            });
+        }
     }
 
     /**
@@ -62,6 +97,9 @@ class SettlementService {
         let totalCost = 0;
 
         // 3. 按價格高到低分配魚貨（bids 已經按價格降序排列）
+        let highestPrice = null;  // 最高成交價
+        let lowestPrice = null;   // 最低成交價
+
         for (const bid of bids) {
             const team = await Team.findById(bid.team_id);
             if (!team) continue;
@@ -72,6 +110,7 @@ class SettlementService {
             if (fulfilledQty > 0) {
                 // ⚠️ 關鍵: 結算時扣除現金 (只扣除成交部分!)
                 const transactionAmount = parseFloat(bid.price) * fulfilledQty;
+                const price = parseFloat(bid.price);
 
                 await Team.update(team.id, {
                     cash: parseFloat(team.cash) - transactionAmount,
@@ -81,6 +120,10 @@ class SettlementService {
 
                 // 更新投標狀態
                 await Bid.updateFulfillment(bid.id, fulfilledQty);
+
+                // 追蹤成交價格範圍
+                if (highestPrice === null || price > highestPrice) highestPrice = price;
+                if (lowestPrice === null || price < lowestPrice) lowestPrice = price;
 
                 remainingSupply -= fulfilledQty;
                 totalFulfilled += fulfilledQty;
@@ -96,7 +139,9 @@ class SettlementService {
         return {
             totalFulfilled,
             totalCost,
-            remainingSupply
+            remainingSupply,
+            highestPrice,
+            lowestPrice
         };
     }
 
@@ -107,6 +152,7 @@ class SettlementService {
      * 2. 從最低價開始用餐廳資金購買
      * 3. 餐廳沒錢後剩餘的不成交
      * 4. 當日結束所有庫存清零
+     * ⚠️ 結算後立即更新 daily_results 的賣出成交量
      */
     static async settleSellingPhase(gameId, dayNumber) {
         const gameDay = await GameDay.findByGameAndDay(gameId, dayNumber);
@@ -121,7 +167,41 @@ class SettlementService {
             fishB: await this._settleSellingForFishType(gameId, dayNumber, FISH_TYPE.B, game, gameDay)
         };
 
+        // ⚠️ 立即更新 daily_results 的賣出成交量
+        await this._updateSellingResults(gameId, gameDay.id, dayNumber);
+
         return results;
+    }
+
+    /**
+     * 更新每隊的賣出成交量到 daily_results
+     */
+    static async _updateSellingResults(gameId, gameDayId, dayNumber) {
+        const teams = await Team.findByGame(gameId);
+        const { BID_TYPE, FISH_TYPE } = require('../config/constants');
+
+        for (const team of teams) {
+            // 從 bids 表彙總賣出成交量
+            const bids = await Bid.findByGameDay(gameId, dayNumber, { team_id: team.id, bid_type: BID_TYPE.SELL });
+
+            let fishASold = 0;
+            let fishBSold = 0;
+
+            for (const bid of bids) {
+                const qty = bid.quantity_fulfilled || 0;
+                if (bid.fish_type === FISH_TYPE.A) {
+                    fishASold += qty;
+                } else if (bid.fish_type === FISH_TYPE.B) {
+                    fishBSold += qty;
+                }
+            }
+
+            // 更新 daily_results 記錄 (應該已存在，由買入結算創建)
+            await DailyResult.upsertPartial(gameId, gameDayId, team.id, dayNumber, {
+                fish_a_sold: fishASold,
+                fish_b_sold: fishBSold
+            });
+        }
     }
 
     /**
@@ -206,6 +286,8 @@ class SettlementService {
         let remainingBudget = restaurantBudget;
         let totalSold = 0;
         let totalRevenue = 0;
+        let highestPrice = null;  // 最高成交價
+        let lowestPrice = null;   // 最低成交價
 
         for (const bid of sortedByPriceAsc) {
             const team = await Team.findById(bid.team_id);
@@ -237,6 +319,10 @@ class SettlementService {
 
                 await Bid.updateFulfillment(bid.id, fulfilledQty);
 
+                // 追蹤成交價格範圍
+                if (highestPrice === null || price > highestPrice) highestPrice = price;
+                if (lowestPrice === null || price < lowestPrice) lowestPrice = price;
+
                 remainingBudget -= revenue;
                 totalSold += fulfilledQty;
                 totalRevenue += revenue;
@@ -246,20 +332,26 @@ class SettlementService {
             }
         }
 
-        // 6. ⚠️ 關鍵：當日結束，所有剩餘庫存歸零！
-        await this._clearInventoryForFishType(gameId, fishType);
+        // 6. ⚠️ 根據遊戲設定決定是否清空庫存
+        if (game.clear_inventory_daily !== false && game.clear_inventory_daily !== 0) {
+            await this._clearInventoryForFishType(gameId, fishType);
+        }
 
         return {
             totalSold,
             totalRevenue,
             totalUnsold,
             totalUnsoldPenalty,
-            remainingBudget
+            remainingBudget,
+            highestPrice,
+            lowestPrice
         };
     }
 
     /**
      * 清空指定魚種的所有團隊庫存
+     * @param {number} gameId
+     * @param {string} fishType
      */
     static async _clearInventoryForFishType(gameId, fishType) {
         const allTeams = await Team.findByGame(gameId);
@@ -340,12 +432,8 @@ class SettlementService {
                 roi: roi
             });
 
-            // 9. 保存每日結果（包含交易量統計、滯銷數量、財務數據、game_day_id）
-            const dailyResult = await DailyResult.create({
-                game_id: gameId,
-                game_day_id: gameDay ? gameDay.id : null,
-                team_id: team.id,
-                day_number: dayNumber,
+            // 9. 更新每日結果（記錄已在買入/賣出結算時創建，這裡更新財務數據）
+            const dailyResult = await DailyResult.upsertPartial(gameId, gameDay ? gameDay.id : null, team.id, dayNumber, {
                 revenue: totalRevenue,
                 cost: totalCost,
                 profit: dailyProfit,

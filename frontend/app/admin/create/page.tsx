@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Form, Input, InputNumber, Button, Card, message, Typography, Divider, Space } from 'antd'
+import { Form, Input, InputNumber, Button, Card, message, Typography, Divider, Space, Switch } from 'antd'
 import { PlusCircleOutlined, ReloadOutlined } from '@ant-design/icons'
 import { api } from '@/lib/api'
 import { getErrorMessage } from '@/lib/utils'
@@ -38,6 +38,8 @@ export default function CreateGamePage() {
     defaultFishBRestaurantBudget: 50000,
     buyingDuration: 300,
     sellingDuration: 300,
+    // 新增：庫存設定
+    clearInventoryDaily: true,
   }
 
   const onFinish = async (values: GameCreateParams) => {
@@ -225,6 +227,29 @@ export default function CreateGamePage() {
               <InputNumber min={0} step={10} style={{ width: 150 }} addonBefore="$" />
             </Form.Item>
           </Space>
+
+          <Divider />
+
+          <Title level={5}>庫存設定</Title>
+          <Paragraph type="secondary" style={{ fontSize: 13 }}>
+            決定每日結束時是否清空未賣出的庫存
+          </Paragraph>
+
+          <Form.Item
+            label="每日結束清空庫存"
+            name="clearInventoryDaily"
+            valuePropName="checked"
+            tooltip="開啟：每日結束時未賣出的魚會清零並收取滯銷費；關閉：庫存可累積到隔天"
+          >
+            <Switch
+              checkedChildren="清空"
+              unCheckedChildren="保留"
+            />
+          </Form.Item>
+          <Paragraph type="secondary" style={{ fontSize: 12, marginTop: -12 }}>
+            <strong>清空模式（預設）：</strong>每日結束時，未賣出的魚會被清零，並依滯銷比例收取罰金<br />
+            <strong>保留模式：</strong>未賣出的魚可累積到隔天繼續販售（適合考量庫存策略的進階玩法）
+          </Paragraph>
         </Card>
 
         <Card title="每日預設參數" style={{ marginBottom: 24 }}>

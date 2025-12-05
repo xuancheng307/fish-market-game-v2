@@ -104,6 +104,9 @@ function gameToApi(dbRow) {
         buyingDuration: dbRow.buying_duration,
         sellingDuration: dbRow.selling_duration,
 
+        // 新增：庫存設定
+        clearInventoryDaily: dbRow.clear_inventory_daily !== 0 && dbRow.clear_inventory_daily !== false,
+
         teamNames: dbRow.team_names ? JSON.parse(dbRow.team_names) : [],
         isForceEnded: Boolean(dbRow.is_force_ended),
         forceEndedAt: dbRow.force_ended_at,
@@ -299,6 +302,9 @@ function apiToGame(apiData) {
 
         buying_duration: apiData.buyingDuration,
         selling_duration: apiData.sellingDuration,
+
+        // 新增：庫存設定
+        clear_inventory_daily: apiData.clearInventoryDaily !== false ? 1 : 0,
 
         team_names: Array.isArray(apiData.teamNames) ? JSON.stringify(apiData.teamNames) : null
     };

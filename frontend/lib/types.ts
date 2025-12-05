@@ -37,6 +37,8 @@ export interface Game {
   defaultFishBRestaurantBudget: number
   buyingDuration: number
   sellingDuration: number
+  // 新增：庫存設定
+  clearInventoryDaily: boolean
   isForceEnded: boolean
   forceEndedAt: string | null
   forceEndDay: number | null
@@ -173,4 +175,6 @@ export interface GameCreateParams {
   defaultFishBRestaurantBudget: number
   buyingDuration: number
   sellingDuration: number
+  // 新增：庫存設定
+  clearInventoryDaily: boolean
 }
