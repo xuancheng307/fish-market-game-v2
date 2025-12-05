@@ -136,7 +136,8 @@ class ApiClient {
       return this.client.post(`/admin/games/${gameId}/pause`)
     } else if (status === 'active') {
       return this.client.post(`/admin/games/${gameId}/resume`)
-    } else if (status === 'finished') {
+    } else if (status === 'finished' || status === 'force_ended') {
+      // 強制結束遊戲
       return this.client.post(`/admin/games/${gameId}/force-end`)
     }
     throw new Error('不支持的狀態更新')

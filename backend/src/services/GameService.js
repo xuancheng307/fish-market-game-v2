@@ -17,6 +17,7 @@ const { transaction } = require('../config/database');
 class GameService {
     /**
      * 創建遊戲
+     * ⚠️ 創建前會自動結束所有其他 active 遊戲
      */
     static async createGame(gameData) {
         const {
@@ -54,6 +55,12 @@ class GameService {
         }
 
         return await transaction(async (conn) => {
+            // 0. 先結束所有其他 active 遊戲
+            const existingGames = await Game.findAll({ status: GAME_STATUS.ACTIVE });
+            for (const existingGame of existingGames) {
+                console.log(`[GameService] 自動結束現有 active 遊戲: ${existingGame.id} - ${existingGame.name}`);
+                await Game.forceEnd(existingGame.id, existingGame.current_day);
+            }
             // 1. 創建遊戲（只傳入有值的欄位，讓 Model 使用預設值處理 undefined）
             const createData = {};
             if (name !== undefined) createData.name = name;
