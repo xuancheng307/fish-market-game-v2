@@ -35,12 +35,13 @@
   - ✓ 無退款機制
   - ✓ 複利計算
 
-- [x] **SettlementService.js** ⭐⭐⭐ - 結算邏輯
-  - ✓ 買入結算（批發商→團隊）
-  - ✓ 賣出結算（團隊→餐廳）
-  - ✓ 每日結算（利息、ROI）
-  - ✓ 結算時扣除現金
-  - ✓ 只扣除成交部分
+- [x] **SettlementService.js** ⭐⭐⭐ - 結算邏輯（周結制）
+  - ✓ 買入結算：現金立即扣除成交金額
+  - ✓ 賣出結算：只扣滯銷費，不增加現金（周結制）
+  - ✓ 每日結算：扣除貸款利息
+  - ✓ 現金在遊戲過程中只會減少，不會增加
+  - ✓ ROI = 累積利潤 / (初始預算 + 借貸總額)
+  - ✓ 累積利潤 = Σ(賣出收入 - 買入成本 - 滯銷費 - 利息)
   - ✓ 優先順序：價格優先，早提交優先
   - ✓ 固定滯銷 2.5%
 
@@ -130,15 +131,23 @@ await Team.update(team.id, {
 });
 ```
 
-**結算邏輯** (SettlementService.js:66-76):
+**結算邏輯 - 周結制** (SettlementService.js):
 ```javascript
-// ✓ 結算時扣除現金（只扣成交部分）
-const transactionAmount = parseFloat(bid.price) * fulfilledQty;
+// ⚠️ 買入結算：現金立即扣除
 await Team.update(team.id, {
-    current_budget: parseFloat(team.current_budget) - transactionAmount,
-    [fishType === FISH_TYPE.A ? 'fish_a_inventory' : 'fish_b_inventory']:
-        (fishType === FISH_TYPE.A ? team.fish_a_inventory : team.fish_b_inventory) + fulfilledQty
+    cash: parseFloat(team.cash) - transactionAmount,
+    [inventoryField]: inventory + fulfilledQty
 });
+
+// ⚠️ 賣出結算：只扣滯銷費，不增加現金
+await Team.update(team.id, {
+    cash: parseFloat(team.cash) - unsoldPenalty,  // 只扣滯銷費
+    [inventoryField]: currentInventory - fulfilledQty  // 扣庫存，不加現金
+});
+
+// ⚠️ ROI 計算
+const cumulativeProfit = previousCumulativeProfit + dailyProfit;
+const roi = cumulativeProfit / (initialBudget + totalLoan);
 ```
 
 **優先順序** (Bid.js:39-45):
@@ -176,9 +185,12 @@ Testing:        0% ░░░░░░░░░░░░░░░░░░░░
    - API/前端: camelCase
    - transformers.js 完整轉換
 
-2. **核心商業邏輯已正確實現** ⭐⭐⭐
+2. **核心商業邏輯已正確實現（周結制）** ⭐⭐⭐
    - 借貸在投標時，現金增加
-   - 結算時扣除，只扣成交部分
+   - 買入結算：現金立即扣除
+   - 賣出結算：只扣滯銷費，不增加現金
+   - 現金在遊戲過程中只會減少
+   - ROI = 累積利潤 / (初始預算 + 借貸總額)
    - 無退款機制
    - 優先順序正確
 

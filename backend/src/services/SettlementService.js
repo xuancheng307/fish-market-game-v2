@@ -1,12 +1,15 @@
 /**
  * SettlementService - 結算邏輯服務
  *
- * ⚠️ 核心商業邏輯：
- * 1. 現金扣除發生在結算時 (不是投標時!)
- * 2. 只扣除成交數量的金額
- * 3. 買入：高價優先成交，無滯銷
- * 4. 賣出：先扣最高價2.5%滯銷，再從低價開始用餐廳資金購買
- * 5. 當日結束所有庫存清零
+ * ⚠️ 核心商業邏輯（周結制）：
+ * 1. 買入結算：現金立即扣除成交金額
+ * 2. 賣出結算：只扣滯銷費，不增加現金（周結/遊戲結束才結款）
+ * 3. 每日結算：扣除貸款利息
+ * 4. 現金在遊戲過程中只會減少，不會增加
+ *
+ * ⚠️ ROI 計算：
+ * ROI = 累積利潤 / (初始預算 + 借貸總額)
+ * 累積利潤 = Σ(賣出收入 - 買入成本 - 滯銷費 - 利息)
  */
 
 const Bid = require('../models/Bid');
@@ -213,10 +216,11 @@ class SettlementService {
 
     /**
      * 賣出結算 - 單一魚種
-     * ⚠️ 邏輯：
+     * ⚠️ 周結制邏輯：
      * 1. 先從最高價扣除 2.5% 滯銷（扣庫存、扣滯銷費）
-     * 2. 從最低價開始用餐廳資金購買（加現金、扣庫存）
-     * 3. 餐廳沒錢後剩餘不成交（不加錢、但庫存當天清零）
+     * 2. 從最低價開始用餐廳資金購買（只扣庫存、記錄收入，不增加現金）
+     * 3. 餐廳沒錢後剩餘不成交（庫存當天清零）
+     * 4. 賣出收入只記錄到利潤計算，不入帳到現金
      */
     static async _settleSellingForFishType(gameId, dayNumber, fishType, game, gameDay) {
         // 1. 取得所有賣出投標
@@ -319,8 +323,8 @@ class SettlementService {
                 const inventoryField = fishType === FISH_TYPE.A ? 'fish_a_inventory' : 'fish_b_inventory';
                 const currentInventory = fishType === FISH_TYPE.A ? team.fish_a_inventory : team.fish_b_inventory;
 
+                // ⚠️ 周結制：只扣庫存，不增加現金（賣出收入只記錄到利潤計算）
                 await Team.update(team.id, {
-                    cash: parseFloat(team.cash) + revenue,
                     [inventoryField]: currentInventory - fulfilledQty
                 });
 
@@ -332,7 +336,7 @@ class SettlementService {
 
                 remainingBudget -= revenue;
                 totalSold += fulfilledQty;
-                totalRevenue += revenue;
+                totalRevenue += revenue;  // 記錄收入用於利潤計算
             } else {
                 // 餐廳沒錢了，標記為未成交
                 await Bid.updateFulfillment(bid.id, 0);
@@ -373,6 +377,9 @@ class SettlementService {
 
     /**
      * 每日結算 (計算利息、ROI、保存結果)
+     * ⚠️ 周結制：
+     * - 累積利潤 = 歷日利潤加總（不是現金計算）
+     * - ROI = 累積利潤 / (初始預算 + 借貸總額)
      */
     static async dailySettlement(gameId, dayNumber) {
         const teams = await Team.findByGame(gameId);
@@ -383,17 +390,10 @@ class SettlementService {
         for (const team of teams) {
             // 1. 計算並扣除利息
             const interestResult = await LoanService.calculateAndDeductInterest(team.id, gameId);
-
-            // 2. 計算累計損益
             const cash = interestResult.cash;
             const totalLoan = interestResult.totalLoan;
-            const cumulativeProfit = cash + totalLoan - parseFloat(game.initial_budget);
 
-            // 3. 計算 ROI
-            const totalInvestment = parseFloat(game.initial_budget) + parseFloat(team.total_loan_principal);
-            const roi = totalInvestment > 0 ? (cumulativeProfit / totalInvestment) * 100 : 0;
-
-            // 4. 計算當日魚類交易量統計和財務數據
+            // 2. 計算當日魚類交易量統計和財務數據
             const { BID_TYPE, FISH_TYPE } = require('../config/constants');
             const teamBids = await Bid.findByGameDay(gameId, dayNumber, { team_id: team.id });
 
@@ -422,16 +422,29 @@ class SettlementService {
                 }
             }
 
-            // 5. 計算滯銷數量 (買入 - 賣出 = 滯銷)
+            // 3. 計算滯銷數量 (買入 - 賣出 = 滯銷)
             const fishAUnsold = Math.max(0, fishAPurchased - fishASold);
             const fishBUnsold = Math.max(0, fishBPurchased - fishBSold);
 
-            // 6. 計算滯銷費用
+            // 4. 計算滯銷費用
             const unsoldFeePerKg = parseFloat(game.unsold_fee_per_kg);
             const totalUnsoldFee = (fishAUnsold + fishBUnsold) * unsoldFeePerKg;
 
-            // 7. 計算當日利潤
+            // 5. 計算當日利潤
             const dailyProfit = totalRevenue - totalCost - totalUnsoldFee - interestResult.interest;
+
+            // 6. ⚠️ 周結制：累積利潤 = 前日累積利潤 + 當日利潤
+            const previousDayResult = dayNumber > 1
+                ? await DailyResult.findByTeamAndDay(team.id, gameId, dayNumber - 1)
+                : null;
+            const previousCumulativeProfit = previousDayResult
+                ? parseFloat(previousDayResult.cumulative_profit) || 0
+                : 0;
+            const cumulativeProfit = previousCumulativeProfit + dailyProfit;
+
+            // 7. ⚠️ ROI = 累積利潤 / (初始預算 + 借貸總額)
+            const totalInvestment = parseFloat(game.initial_budget) + parseFloat(totalLoan);
+            const roi = totalInvestment > 0 ? cumulativeProfit / totalInvestment : 0;
 
             // 8. 更新團隊狀態
             await Team.update(team.id, {
@@ -467,7 +480,8 @@ class SettlementService {
                 cash,
                 totalLoan,
                 cumulativeProfit,
-                roi
+                roi,
+                dailyProfit
             });
         }
 
