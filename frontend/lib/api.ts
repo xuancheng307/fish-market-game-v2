@@ -273,6 +273,16 @@ class ApiClient {
       message: '獲取成功'
     }
   }
+
+  // 新增：獲取當前天的結果（含 buyBidTotal）
+  async getCurrentDayResult(gameId: number): Promise<ApiResponse<DailyResult | null>> {
+    const response: ApiResponse<any> = await this.client.get(`/team/games/${gameId}/my-status`)
+    return {
+      success: true,
+      data: response.data?.currentDayResult || null,
+      message: '獲取成功'
+    }
+  }
 }
 
 export const api = new ApiClient()

@@ -1,12 +1,18 @@
 /**
  * BidService - 投標業務邏輯服務
  * 使用 LoanService 處理借貸
+ *
+ * ⚠️ 借款邏輯 (buy_bid_total):
+ * - 每次提交買入標單時，累加到 buy_bid_total
+ * - 當 buy_bid_total > cash 時，借款差額
+ * - 刪除標單時減少 buy_bid_total，但不退款（借了就是借了）
  */
 
 const Bid = require('../models/Bid');
 const Team = require('../models/Team');
 const Game = require('../models/Game');
 const GameDay = require('../models/GameDay');
+const DailyResult = require('../models/DailyResult');
 const LoanService = require('./LoanService');
 const { AppError } = require('../middleware/errorHandler');
 const { ERROR_CODES, DAY_STATUS, BID_TYPE } = require('../config/constants');
@@ -85,8 +91,34 @@ class BidService {
                 );
             }
 
-            const requiredAmount = price * quantity;
-            const loanResult = await LoanService.checkAndBorrow(team.id, requiredAmount);
+            // ⚠️ 新借款邏輯：使用 buy_bid_total 判斷
+            const bidAmount = price * quantity;
+
+            // 獲取當前 buy_bid_total
+            const dailyResult = await DailyResult.findByTeamAndDay(team.id, gameId, game.current_day);
+            const currentBuyBidTotal = dailyResult ? parseFloat(dailyResult.buy_bid_total || 0) : 0;
+            const newBuyBidTotal = currentBuyBidTotal + bidAmount;
+
+            // 檢查是否需要借款：當 buy_bid_total > cash 時借款差額
+            const cash = parseFloat(team.cash);
+            let loanResult = { borrowed: false, loanAmount: 0, cash: cash };
+
+            if (newBuyBidTotal > cash) {
+                // 需要借款的金額 = 新的 buy_bid_total - cash
+                // 但如果之前已經借過（currentBuyBidTotal > cash），只借這次增加造成的差額
+                const previousShortfall = Math.max(0, currentBuyBidTotal - cash);
+                const newShortfall = newBuyBidTotal - cash;
+                const loanNeeded = newShortfall - previousShortfall;
+
+                if (loanNeeded > 0) {
+                    loanResult = await LoanService.checkAndBorrow(team.id, cash + loanNeeded);
+                }
+            }
+
+            // 更新 daily_results 的 buy_bid_total
+            await DailyResult.upsertPartial(gameId, gameDay.id, team.id, game.current_day, {
+                buy_bid_total: newBuyBidTotal
+            });
 
             // 創建投標記錄
             const bid = await Bid.create({
@@ -102,7 +134,8 @@ class BidService {
 
             return {
                 bid,
-                loanInfo: loanResult
+                loanInfo: loanResult,
+                buyBidTotal: newBuyBidTotal
             };
         }
 
@@ -247,6 +280,7 @@ class BidService {
 
     /**
      * 刪除投標（僅限 pending 狀態）
+     * ⚠️ 刪除買入標單時會減少 buy_bid_total，但不會退還借款
      */
     static async deleteBid(bidId, teamId) {
         const bid = await Bid.findById(bidId);
@@ -266,9 +300,24 @@ class BidService {
             throw new AppError('只能刪除待處理的投標', ERROR_CODES.INVALID_BID, 400);
         }
 
+        // ⚠️ 如果是買入標單，減少 buy_bid_total（但不退款）
+        if (bid.bid_type === BID_TYPE.BUY) {
+            const bidAmount = parseFloat(bid.price) * bid.quantity_submitted;
+            const dailyResult = await DailyResult.findByTeamAndDay(bid.team_id, bid.game_id, bid.day_number);
+
+            if (dailyResult) {
+                const currentBuyBidTotal = parseFloat(dailyResult.buy_bid_total || 0);
+                const newBuyBidTotal = Math.max(0, currentBuyBidTotal - bidAmount);
+
+                await DailyResult.upsertPartial(bid.game_id, bid.game_day_id, bid.team_id, bid.day_number, {
+                    buy_bid_total: newBuyBidTotal
+                });
+            }
+        }
+
         await Bid.delete(bidId);
 
-        return { success: true };
+        return { success: true, deletedBid: bid };
     }
 }
 

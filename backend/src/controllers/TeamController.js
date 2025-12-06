@@ -165,6 +165,9 @@ class TeamController {
         const { dailyResultToApi } = require('../utils/transformers');
         const dailyResults = await DailyResult.findByTeam(myTeam.id, parseInt(req.params.id));
 
+        // 獲取當前天的 daily result（包含 buy_bid_total）
+        const currentDayResult = await DailyResult.findByTeamAndDay(myTeam.id, parseInt(req.params.id), game.current_day);
+
         res.json({
             success: true,
             data: {
@@ -173,7 +176,8 @@ class TeamController {
                 myTeam: teamToApi(myTeam),
                 loanStatus,
                 myBids: bids.map(bid => bidToApi(bid)),
-                dailyResults: dailyResults.map(dr => dailyResultToApi(dr))  // 新增：歷史每日結果
+                dailyResults: dailyResults.map(dr => dailyResultToApi(dr)),  // 歷史每日結果
+                currentDayResult: currentDayResult ? dailyResultToApi(currentDayResult) : null  // 當前天結果（含 buyBidTotal）
             }
         });
     });

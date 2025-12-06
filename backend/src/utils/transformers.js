@@ -245,6 +245,9 @@ function dailyResultToApi(dbRow) {
         fishAUnsold: dbRow.fish_a_unsold || 0,
         fishBUnsold: dbRow.fish_b_unsold || 0,
 
+        // 當日買入標單總額
+        buyBidTotal: parseFloat(dbRow.buy_bid_total) || 0,
+
         // 團隊編號
         teamNumber: dbRow.team_number || null,
 

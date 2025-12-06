@@ -12,6 +12,8 @@ import {
   TrophyOutlined,
   RiseOutlined,
   FallOutlined,
+  DeleteOutlined,
+  ExclamationCircleOutlined,
 } from '@ant-design/icons'
 import { api } from '@/lib/api'
 import { wsClient } from '@/lib/websocket'
@@ -27,6 +29,8 @@ export default function TeamHomePage() {
   const [myTeam, setMyTeam] = useState<Team | null>(null)
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
+  const [deleting, setDeleting] = useState<number | null>(null)  // 正在刪除的標單 ID
+  const [buyBidTotal, setBuyBidTotal] = useState<number>(0)  // 當日買入標單總額
   const [settlementModalVisible, setSettlementModalVisible] = useState(false)
   const [settlementResult, setSettlementResult] = useState<DailyResult | null>(null)
 
@@ -49,6 +53,10 @@ export default function TeamHomePage() {
         // 載入我的投標記錄
         const bidsResponse = await api.getMyBids(gameResponse.data.id, gameResponse.data.currentDay)
         setMyBids(bidsResponse.data || [])
+
+        // 載入當前天的結果（含 buyBidTotal）
+        const currentDayResponse = await api.getCurrentDayResult(gameResponse.data.id)
+        setBuyBidTotal(currentDayResponse.data?.buyBidTotal || 0)
       }
     } catch (error) {
       message.error('載入資料失敗')
@@ -181,6 +189,30 @@ export default function TeamHomePage() {
     }
   }
 
+  // 刪除標單
+  const handleDeleteBid = async (bidId: number) => {
+    Modal.confirm({
+      title: '確認刪除',
+      icon: <ExclamationCircleOutlined />,
+      content: '確定要刪除此標單嗎？注意：如果已經借款，借款不會退還。',
+      okText: '確定刪除',
+      cancelText: '取消',
+      okType: 'danger',
+      onOk: async () => {
+        try {
+          setDeleting(bidId)
+          await api.deleteBid(bidId)
+          message.success('標單已刪除')
+          await loadData()
+        } catch (error: any) {
+          message.error(getErrorMessage(error, '刪除失敗'))
+        } finally {
+          setDeleting(null)
+        }
+      }
+    })
+  }
+
   // 獲取投標狀態標籤
   const getBidStatusTag = (bid: Bid) => {
     switch (bid.status) {
@@ -260,6 +292,29 @@ export default function TeamHomePage() {
       width: 120,
       render: (record: Bid) => getBidStatusTag(record),
     },
+    {
+      title: '操作',
+      key: 'action',
+      width: 80,
+      render: (record: Bid) => {
+        // 只有 pending 狀態的標單可以刪除
+        if (record.status !== 'pending') {
+          return <span style={{ color: '#999' }}>-</span>
+        }
+        return (
+          <Button
+            type="link"
+            danger
+            size="small"
+            icon={<DeleteOutlined />}
+            loading={deleting === record.id}
+            onClick={() => handleDeleteBid(record.id)}
+          >
+            刪除
+          </Button>
+        )
+      },
+    },
   ]
 
   // 判斷當前可以投標的類型（使用 game.phase）
@@ -337,6 +392,55 @@ export default function TeamHomePage() {
                 </Card>
               </Col>
             </Row>
+          </Card>
+        )}
+
+        {/* 資金狀況（買入階段顯示） */}
+        {canBuy && myTeam && (
+          <Card title={<><DollarOutlined /> 資金狀況</>} size="small">
+            <Row gutter={16}>
+              <Col xs={24} sm={12} md={6}>
+                <Statistic
+                  title="當前現金"
+                  value={myTeam.cash}
+                  prefix="$"
+                  valueStyle={{ color: myTeam.cash > 0 ? '#3f8600' : '#cf1322' }}
+                />
+              </Col>
+              <Col xs={24} sm={12} md={6}>
+                <Statistic
+                  title="當日買入標單總額"
+                  value={buyBidTotal}
+                  prefix="$"
+                  valueStyle={{ color: buyBidTotal > myTeam.cash ? '#faad14' : '#1890ff' }}
+                />
+              </Col>
+              <Col xs={24} sm={12} md={6}>
+                <Statistic
+                  title="當前貸款"
+                  value={myTeam.totalLoan}
+                  prefix="$"
+                  valueStyle={{ color: myTeam.totalLoan > 0 ? '#cf1322' : '#3f8600' }}
+                />
+              </Col>
+              <Col xs={24} sm={12} md={6}>
+                <Statistic
+                  title="累積收益"
+                  value={myTeam.cumulativeProfit}
+                  prefix="$"
+                  valueStyle={{ color: myTeam.cumulativeProfit > 0 ? '#3f8600' : myTeam.cumulativeProfit < 0 ? '#cf1322' : '#000' }}
+                />
+              </Col>
+            </Row>
+            {buyBidTotal > myTeam.cash && (
+              <Alert
+                message="已觸發借款"
+                description={`您的買入標單總額 $${buyBidTotal.toLocaleString()} 超過現金 $${myTeam.cash.toLocaleString()}，差額已自動借款。借款會產生利息。`}
+                type="warning"
+                showIcon
+                style={{ marginTop: 16 }}
+              />
+            )}
           </Card>
         )}
 
@@ -546,7 +650,7 @@ export default function TeamHomePage() {
               pageSize: 10,
               showTotal: (total) => `共 ${total} 筆投標`,
             }}
-            scroll={{ x: 900 }}
+            scroll={{ x: 1000 }}
           />
         </Card>
       </Space>

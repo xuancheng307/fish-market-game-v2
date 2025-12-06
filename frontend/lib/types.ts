@@ -120,6 +120,7 @@ export interface DailyResult {
   dailyProfit: number
   cumulativeProfit: number
   roi: number
+  buyBidTotal: number  // 當日買入標單總額
   teamNumber: number
   createdAt: string
 }

@@ -120,7 +120,8 @@ class DailyResult {
             'revenue', 'cost', 'profit', 'interest_paid', 'unsold_fee',
             'cash', 'total_loan', 'fish_a_inventory', 'fish_b_inventory',
             'fish_a_purchased', 'fish_a_sold', 'fish_b_purchased', 'fish_b_sold',
-            'fish_a_unsold', 'fish_b_unsold', 'cumulative_profit', 'roi'
+            'fish_a_unsold', 'fish_b_unsold', 'cumulative_profit', 'roi',
+            'buy_bid_total'  // 當日買入標單總額
         ];
 
         // 檢查是否已存在
