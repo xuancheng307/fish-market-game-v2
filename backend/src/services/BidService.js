@@ -213,7 +213,7 @@ class BidService {
             throw new AppError('只能修改待處理的投標', ERROR_CODES.INVALID_BID, 400);
         }
 
-        // 處理買入投標的資金檢查
+        // 處理買入投標的資金檢查和 buy_bid_total 更新
         if (bid.bid_type === BID_TYPE.BUY && (updates.price || updates.quantity)) {
             const oldPrice = parseFloat(bid.price);
             const oldQuantity = bid.quantity_submitted;
@@ -223,14 +223,37 @@ class BidService {
             const newQuantity = updates.quantity !== undefined ? updates.quantity : oldQuantity;
             const newAmount = newPrice * newQuantity;
 
-            // ⚠️ 只借差額，不是全額
+            // ⚠️ 更新 buy_bid_total（增減差額）
             const difference = newAmount - oldAmount;
 
-            if (difference > 0) {
-                // 需要額外借款
-                await LoanService.checkAndBorrow(team.id, difference);
+            if (difference !== 0) {
+                const game = await Game.findById(bid.game_id);
+                const dailyResult = await DailyResult.findByTeamAndDay(bid.team_id, bid.game_id, game.current_day);
+                const currentBuyBidTotal = dailyResult ? parseFloat(dailyResult.buy_bid_total || 0) : 0;
+                const newBuyBidTotal = Math.max(0, currentBuyBidTotal + difference);
+
+                // 更新 buy_bid_total
+                const gameDay = await GameDay.findByGameAndDay(bid.game_id, game.current_day);
+                await DailyResult.upsertPartial(bid.game_id, gameDay.id, bid.team_id, game.current_day, {
+                    buy_bid_total: newBuyBidTotal
+                });
+
+                // ⚠️ 如果增加金額且 newBuyBidTotal > cash，需要借款
+                if (difference > 0) {
+                    const cash = parseFloat(team.cash);
+                    if (newBuyBidTotal > cash) {
+                        // 計算需要借款的金額（只借新增的差額）
+                        const previousShortfall = Math.max(0, currentBuyBidTotal - cash);
+                        const newShortfall = newBuyBidTotal - cash;
+                        const loanNeeded = newShortfall - previousShortfall;
+
+                        if (loanNeeded > 0) {
+                            await LoanService.checkAndBorrow(team.id, cash + loanNeeded);
+                        }
+                    }
+                }
             }
-            // difference < 0 時不處理退款（遊戲規則：借了就是借了）
+            // difference < 0 時只更新 buy_bid_total，不退款（遊戲規則：借了就是借了）
         }
 
         // 處理賣出投標的庫存檢查
