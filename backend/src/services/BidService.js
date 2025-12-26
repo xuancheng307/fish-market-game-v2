@@ -139,18 +139,24 @@ class BidService {
             };
         }
 
-        // 6. 賣出投標：檢查庫存
+        // 6. 賣出投標：檢查庫存（累計當天已投標數量）
         if (bidType === BID_TYPE.SELL) {
             const inventoryField = fishType === 'A' ? 'fish_a_inventory' : 'fish_b_inventory';
             const currentInventory = team[inventoryField];
 
-            if (currentInventory < quantity) {
+            // ⚠️ 累計當天該魚種已投標的數量（existingBids 已在上面查詢過）
+            const alreadyBidQuantity = existingBids.reduce((sum, b) => sum + b.quantity_submitted, 0);
+            const totalAfterThisBid = alreadyBidQuantity + quantity;
+
+            if (totalAfterThisBid > currentInventory) {
                 throw new AppError(
-                    '庫存不足',
+                    `投標數量超過可用庫存（已投標 ${alreadyBidQuantity} kg + 本次 ${quantity} kg = ${totalAfterThisBid} kg，庫存僅 ${currentInventory} kg）`,
                     ERROR_CODES.INSUFFICIENT_INVENTORY,
                     400,
                     {
-                        required: quantity,
+                        requested: quantity,
+                        alreadyBid: alreadyBidQuantity,
+                        totalWouldBe: totalAfterThisBid,
                         available: currentInventory,
                         fishType
                     }
@@ -256,18 +262,31 @@ class BidService {
             // difference < 0 時只更新 buy_bid_total，不退款（遊戲規則：借了就是借了）
         }
 
-        // 處理賣出投標的庫存檢查
+        // 處理賣出投標的庫存檢查（累計當天其他投標數量）
         if (bid.bid_type === BID_TYPE.SELL && updates.quantity !== undefined) {
             const inventoryField = bid.fish_type === 'A' ? 'fish_a_inventory' : 'fish_b_inventory';
             const currentInventory = team[inventoryField];
 
-            if (currentInventory < updates.quantity) {
+            // ⚠️ 查詢當天同魚種的所有賣出投標，排除當前這筆
+            const allSellBids = await Bid.findByGameDay(bid.game_id, bid.day_number, {
+                team_id: bid.team_id,
+                bid_type: BID_TYPE.SELL,
+                fish_type: bid.fish_type
+            });
+            const otherBidsQuantity = allSellBids
+                .filter(b => b.id !== bid.id)
+                .reduce((sum, b) => sum + b.quantity_submitted, 0);
+            const totalAfterUpdate = otherBidsQuantity + updates.quantity;
+
+            if (totalAfterUpdate > currentInventory) {
                 throw new AppError(
-                    '庫存不足',
+                    `投標數量超過可用庫存（其他投標 ${otherBidsQuantity} kg + 本次 ${updates.quantity} kg = ${totalAfterUpdate} kg，庫存僅 ${currentInventory} kg）`,
                     ERROR_CODES.INSUFFICIENT_INVENTORY,
                     400,
                     {
-                        required: updates.quantity,
+                        requested: updates.quantity,
+                        otherBids: otherBidsQuantity,
+                        totalWouldBe: totalAfterUpdate,
                         available: currentInventory,
                         fishType: bid.fish_type
                     }
@@ -302,7 +321,7 @@ class BidService {
     }
 
     /**
-     * 刪除投標（僅限 pending 狀態）
+     * 刪除投標（僅限當天、當前階段、pending 狀態）
      * ⚠️ 刪除買入標單時會減少 buy_bid_total，但不會退還借款
      */
     static async deleteBid(bidId, teamId) {
@@ -321,6 +340,39 @@ class BidService {
 
         if (bid.status !== 'pending') {
             throw new AppError('只能刪除待處理的投標', ERROR_CODES.INVALID_BID, 400);
+        }
+
+        // ⚠️ 檢查是否為當天的投標，且在對應的投標階段
+        const game = await Game.findById(bid.game_id);
+        if (!game) {
+            throw new AppError('遊戲不存在', ERROR_CODES.GAME_NOT_FOUND, 404);
+        }
+
+        // 只能刪除當天的投標
+        if (bid.day_number !== game.current_day) {
+            throw new AppError(
+                `只能刪除當天的投標（目前是第 ${game.current_day} 天，該投標是第 ${bid.day_number} 天）`,
+                ERROR_CODES.INVALID_PHASE,
+                400
+            );
+        }
+
+        // 買入投標只能在 buying_open 階段刪除
+        if (bid.bid_type === BID_TYPE.BUY && game.phase !== DAY_STATUS.BUYING_OPEN) {
+            throw new AppError(
+                '買入投標只能在買入階段刪除',
+                ERROR_CODES.INVALID_PHASE,
+                400
+            );
+        }
+
+        // 賣出投標只能在 selling_open 階段刪除
+        if (bid.bid_type === BID_TYPE.SELL && game.phase !== DAY_STATUS.SELLING_OPEN) {
+            throw new AppError(
+                '賣出投標只能在賣出階段刪除',
+                ERROR_CODES.INVALID_PHASE,
+                400
+            );
         }
 
         // ⚠️ 如果是買入標單，減少 buy_bid_total（但不退款）

@@ -30,11 +30,14 @@ class LoanService {
         // 最大借貸額度
         const maxLoan = parseFloat(game.initial_budget) * parseFloat(game.max_loan_ratio);
 
-        // 已使用的借貸
+        // 已借貸本金（不含利息）
+        const totalLoanPrincipal = parseFloat(team.total_loan_principal);
+
+        // 已借貸總額（含利息）
         const totalLoan = parseFloat(team.total_loan);
 
-        // 剩餘可借貸額度
-        const remainingLoanCapacity = Math.max(0, maxLoan - totalLoan);
+        // ⚠️ 剩餘可借貸額度：用本金判斷，不受利息影響
+        const remainingLoanCapacity = Math.max(0, maxLoan - totalLoanPrincipal);
 
         // 可用資金 = 現金 + 剩餘借貸額度
         const availableFunds = parseFloat(team.cash) + remainingLoanCapacity;
@@ -42,6 +45,7 @@ class LoanService {
         return {
             cash: parseFloat(team.cash),
             totalLoan,
+            totalLoanPrincipal,
             maxLoan,
             remainingLoanCapacity,
             availableFunds
@@ -150,16 +154,16 @@ class LoanService {
      */
     static async getLoanStatus(teamId) {
         const fundsInfo = await this.calculateAvailableFunds(teamId);
-        const team = await Team.findById(teamId);
 
         return {
             cash: fundsInfo.cash,
             totalLoan: fundsInfo.totalLoan,
-            totalLoanPrincipal: parseFloat(team.total_loan_principal),
+            totalLoanPrincipal: fundsInfo.totalLoanPrincipal,
             maxLoan: fundsInfo.maxLoan,
             remainingLoanCapacity: fundsInfo.remainingLoanCapacity,
             availableFunds: fundsInfo.availableFunds,
-            loanUtilization: fundsInfo.maxLoan > 0 ? (fundsInfo.totalLoan / fundsInfo.maxLoan * 100).toFixed(2) : 0
+            // ⚠️ 借貸使用率：用本金計算
+            loanUtilization: fundsInfo.maxLoan > 0 ? (fundsInfo.totalLoanPrincipal / fundsInfo.maxLoan * 100).toFixed(2) : 0
         };
     }
 }
